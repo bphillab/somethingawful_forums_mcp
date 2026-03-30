@@ -909,50 +909,16 @@ async def sa_search(params: SearchInput) -> str:
 
     Returns:
         str: Search results in the requested format.
-
-        Markdown format:
-            # Search Results for "query" (page 1 of N)
-            ## Thread Title (Thread ID: 456)
-            - **Forum**: Forum Name | **Posted by**: username | **Date**: Jan 1, 2024
-            Excerpt of matching post content...
-
-        JSON format:
-        {
-          "query": "search terms",
-          "page": 1,
-          "total_pages": 3,
-          "results": [
-            {
-              "thread_id": 456,
-              "thread_title": "Thread Title",
-              "post_id": 123,
-              "forum": "Forum Name",
-              "author": "username",
-              "date": "Jan 1, 2024",
-              "excerpt": "...matching text..."
-            }
-          ]
-        }
-
-        Error response: "Error: <message>"
-
-    Examples:
-        - "Search for posts about Minecraft" → query="Minecraft"
-        - "Find threads about Python in the programming forum" →
-            query="Python", forum_id=<programming forum id>
-        - "Find posts by user Lowtax about money" →
-            query="money", user="Lowtax"
-        - "Search for threads titled 'goon meet'" →
-            query="intitle:goon meet"
     """
-    # Build the query string, appending username: operator if user is specified
     q = params.query
     if params.user:
-        q = f"{q} username:{params.user}"
+        q = f'{q} username:"{params.user}"'
 
-    # Step 1: POST to query.php to initiate search and capture the qid
-    post_data: Dict[str, Any] = {"q": q}
-    if params.forum_id:
+    post_data: Dict[str, Any] = {
+        "action": "query",
+        "q": q,
+    }
+    if params.forum_id is not None:
         post_data["forums[]"] = str(params.forum_id)
 
     try:
@@ -961,17 +927,30 @@ async def sa_search(params: SearchInput) -> str:
     except Exception as e:
         return _handle_error(e)
 
-    # The client follows the redirect; extract qid from the final URL
+    # SA may redirect to a results URL with qid, or return an intermediate page.
     qid_match = re.search(r"qid=(\d+)", str(resp.url))
     if not qid_match:
-        # If we didn't get redirected (e.g. no results at all), check page text
-        if "no results" in resp.text.lower() or "0 results" in resp.text.lower():
+        soup = _soup(resp.text)
+        qid_link = soup.select_one("a[href*='qid=']")
+        if qid_link:
+            qid_match = re.search(r"qid=(\d+)", _attr(qid_link, "href"))
+
+    if not qid_match:
+        page_text = resp.text.lower()
+        if "search the forums" in page_text and "example searches" in page_text:
+            return (
+                f"Error: SA returned the search form instead of results for '{params.query}'. "
+                "Try a simpler query or constrain it to a forum."
+            )
+        if "no results" in page_text or "0 results" in page_text:
             return f"No results found for '{params.query}'. Try different search terms."
-        return "Error: Could not initiate search — SA may be rate-limiting or the query was rejected."
+        return (
+            "Error: Could not initiate search — SA may have rejected the query, "
+            "returned the form again, or be rate limiting."
+        )
 
     qid = qid_match.group(1)
 
-    # Step 2: GET the paginated results page
     results_url = f"{BASE_URL}/query.php?action=results&qid={qid}&page={params.page}"
     try:
         resp = await _session.get(results_url)
@@ -981,11 +960,8 @@ async def sa_search(params: SearchInput) -> str:
 
     soup = _soup(resp.text)
 
-    # Extract total result count and page info from header text
-    # SA shows something like "Showing results 1 to 40 of 312 results"
     total_pages = 1
     result_count = 0
-    count_text = ""
     for tag in soup.find_all(string=re.compile(r"Showing results", re.I)):
         count_text = tag.strip()
         count_match = re.search(r"of\s+([\d,]+)\s+results?", count_text, re.I)
@@ -1001,11 +977,6 @@ async def sa_search(params: SearchInput) -> str:
 
     results: List[Dict[str, Any]] = []
 
-    # Each result is grouped around a showthread link.
-    # Structure: <a href="showthread.php?goto=post&postid=...">Thread Title</a>
-    #            <a href="member.php?...">Author</a>
-    #            <a href="forumdisplay.php?...">Forum Name</a>
-    #            date text + excerpt
     thread_links = soup.select("a[href*='showthread.php']")
     for thread_link in thread_links:
         href = _attr(thread_link, "href")
@@ -1015,8 +986,9 @@ async def sa_search(params: SearchInput) -> str:
         tid = int(tid_match.group(1)) if tid_match else 0
         thread_title = _text(thread_link)
 
-        # Walk to a common ancestor that contains the author and forum links
         parent = thread_link.parent
+        author_link = None
+        forum_link = None
         for _ in range(5):
             if parent is None:
                 break
@@ -1029,14 +1001,12 @@ async def sa_search(params: SearchInput) -> str:
         author = _text(author_link) if author_link else ""
         forum_name = _text(forum_link) if forum_link else ""
 
-        # Extract date: "at Mon DD, YYYY HH:MM"
         parent_text = parent.get_text(" ", strip=True) if parent else ""
         date = ""
         date_match = re.search(r"\bat\s+(\w{3}\s+\d{1,2},\s+\d{4}\s+\d{1,2}:\d{2})", parent_text)
         if date_match:
             date = date_match.group(1)
 
-        # Excerpt: text after the date, or fallback to text around the link
         excerpt = ""
         if date_match and parent:
             after_date = parent_text[date_match.end():].strip()
@@ -1069,7 +1039,7 @@ async def sa_search(params: SearchInput) -> str:
             indent=2,
         )
 
-    lines = [f"# Search Results for \"{params.query}\" (page {params.page} of {total_pages})\n"]
+    lines = [f'# Search Results for "{params.query}" (page {params.page} of {total_pages})\n']
     if result_count:
         lines.append(f"*{result_count} total results*\n")
     for r in results:
