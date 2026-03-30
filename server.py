@@ -1574,6 +1574,8 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         context = ""
         unread_url = ""
         unread_count = 0
+        unread_page = 0
+        first_unread_post_id = 0
 
         row = link.find_parent("tr")
         title = _extract_thread_title_from_row(row) if row is not None else ""
@@ -1583,6 +1585,22 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         if row is not None:
             unread_url = _extract_unread_link_from_row(row)
             unread_count = _extract_unread_count_from_row(row)
+
+        if unread_url:
+            try:
+                unread_resp = await _session.get(unread_url)
+                unread_resp.raise_for_status()
+                final_url = str(unread_resp.url)
+
+                page_match = re.search(r"pagenumber=(\d+)", final_url)
+                if page_match:
+                    unread_page = int(page_match.group(1))
+
+                post_match = re.search(r"postid=(\d+)", final_url)
+                if post_match:
+                    first_unread_post_id = int(post_match.group(1))
+            except Exception:
+                pass
 
         parent = link.parent
         for _ in range(4):
@@ -1613,6 +1631,8 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
                 "context": context,
                 "unread_count": unread_count,
                 "unread_url": unread_url,
+                "unread_page": unread_page,
+                "first_unread_post_id": first_unread_post_id,
             }
         )
     if not threads:
@@ -1633,6 +1653,10 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         meta_parts.append(f"**Link**: {t['url']}")
         if t["unread_url"]:
             meta_parts.append(f"**Unread link**: {t['unread_url']}")
+        if t["unread_page"]:
+            meta_parts.append(f"**Unread page**: {t['unread_page']}")
+        if t["first_unread_post_id"]:
+            meta_parts.append(f"**First unread post**: {t['first_unread_post_id']}")
         lines.append("- " + " | ".join(meta_parts))
         if t["context"]:
             lines.append(f"> {t['context']}")
