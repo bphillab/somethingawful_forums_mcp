@@ -239,6 +239,38 @@ def _extract_unread_count_from_row(row: Optional[Tag]) -> int:
     if unread_count_text.isdigit():
         return int(unread_count_text)
     return 0
+
+
+def _extract_last_page_url_from_row(row: Optional[Tag]) -> str:
+    """Extract a last-page or last-post URL from a thread row, if present."""
+    if row is None:
+        return ""
+
+    # Prefer an explicit "Last post" jump if SA provides it.
+    lastpost_link = row.select_one(".title_pages a[href*='goto=lastpost']")
+    if lastpost_link:
+        href = _attr(lastpost_link, "href")
+        if href:
+            return f"{BASE_URL}/{href.lstrip('/')}"
+
+    # Otherwise use the highest page number shown in the thread row.
+    page_links = row.select(".title_pages a[href*='pagenumber=']")
+    last_page_num = 0
+    last_page_href = ""
+    for a in page_links:
+        href = _attr(a, "href")
+        m = re.search(r"pagenumber=(\d+)", href)
+        if m:
+            page_num = int(m.group(1))
+            if page_num > last_page_num:
+                last_page_num = page_num
+                last_page_href = href
+
+    if last_page_href:
+        return f"{BASE_URL}/{last_page_href.lstrip('/')}"
+
+    return ""
+
 # ─────────────────────────── Pydantic Models ──────────────────────────────────
 
 
@@ -378,6 +410,7 @@ class ListUserCPThreadsInput(BaseModel):
         description="Output format: 'markdown' (default) or 'json'",
         pattern="^(markdown|json)$",
     )
+
 
 # ─────────────────────────── Tools ────────────────────────────────────────────
 
@@ -1495,7 +1528,7 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         Markdown format:
             # User CP Threads
             ## Thread Title (Thread ID: 12345)
-            - **Forum**: Forum Name | **Link**: https://...
+            - **Forum**: Forum Name | **Link**: https://... | **Last page**: https://...
 
         JSON format:
         {
@@ -1506,6 +1539,7 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
               "thread_title": "Thread Title",
               "forum": "Forum Name",
               "url": "https://forums.somethingawful.com/showthread.php?...",
+              "last_page_url": "https://forums.somethingawful.com/showthread.php?threadid=12345&...",
               "context": "..."
             }
           ]
@@ -1552,9 +1586,11 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         if not title:
             title = _clean_thread_title(_text(link))
 
+        last_page_url = ""
         if row is not None:
             unread_url = _extract_unread_link_from_row(row)
             unread_count = _extract_unread_count_from_row(row)
+            last_page_url = _extract_last_page_url_from_row(row)
 
         if unread_url:
             try:
@@ -1598,6 +1634,7 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
                 "thread_title": title,
                 "forum": forum_name,
                 "url": f"{BASE_URL}/{href.lstrip('/')}",
+                "last_page_url": last_page_url,
                 "context": context,
                 "unread_count": unread_count,
                 "unread_url": unread_url,
@@ -1605,6 +1642,7 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
                 "first_unread_post_id": first_unread_post_id,
             }
         )
+
     if not threads:
         return "No thread links found on usercp.php. Make sure you're logged in (sa_login) and that the page contains subscribed/watch threads."
 
@@ -1621,6 +1659,8 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         if t["forum"]:
             meta_parts.append(f"**Forum**: {t['forum']}")
         meta_parts.append(f"**Link**: {t['url']}")
+        if t["last_page_url"]:
+            meta_parts.append(f"**Last page**: {t['last_page_url']}")
         if t["unread_url"]:
             meta_parts.append(f"**Unread link**: {t['unread_url']}")
         if t["unread_page"]:
