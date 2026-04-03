@@ -425,7 +425,7 @@ class ListUserCPThreadsInput(BaseModel):
         "openWorldHint": True,
     },
 )
-async def sa_login(params: LoginInput) -> str:
+async def sa_login(params: LoginInput=LoginInput()) -> str:
     """Log in to the Something Awful Forums using credentials from environment variables.
 
     Reads SA_USERNAME and SA_PASSWORD from environment variables and establishes
