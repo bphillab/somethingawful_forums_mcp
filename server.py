@@ -10,10 +10,13 @@ Authentication uses your SA username and password, stored as environment
 variables SA_USERNAME and SA_PASSWORD.
 """
 
+import asyncio
 import json
 import os
 import re
+import threading
 from contextlib import asynccontextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -32,6 +35,8 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/120.0.0.0 Safari/537.36"
 )
+HEALTH_HOST = "0.0.0.0"
+HEALTH_PORT = 8080
 
 # ─────────────────────────── Session State ────────────────────────────────────
 
@@ -1663,13 +1668,33 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        if self.path in ("/", "/health", "/ready"):
+            body = b"ok\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        body = b"not found\n"
+        self.send_response(404)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: Any) -> None:
+        return
+
+
+def run_health_server() -> None:
+    server = ThreadingHTTPServer((HEALTH_HOST, HEALTH_PORT), HealthHandler)
+    server.serve_forever()
+
+
 if __name__ == "__main__":
-    import uvicorn
-    from mcp.server import Server
-    from mcp.server.stdio import stdio_server
-
-    # FastMCP runs via stdio, but for HTTP we need a different approach
-    # Just use stdio transport (for Claude desktop/local)
-    import asyncio
-
+    threading.Thread(target=run_health_server, daemon=True).start()
     mcp.run()
