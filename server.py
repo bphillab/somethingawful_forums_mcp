@@ -10,19 +10,15 @@ Authentication uses your SA username and password, stored as environment
 variables SA_USERNAME and SA_PASSWORD.
 """
 
-import asyncio
+
 import json
 import os
-import re
 from contextlib import asynccontextmanager
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import httpx
-from bs4 import BeautifulSoup, Tag
-from fastapi import FastAPI
-from mcp.server.fastmcp import FastMCP, Context
-from pydantic import BaseModel, ConfigDict, Field
+from bs4 import BeautifulSoup
+from mcp.server.fastmcp import FastMCP
 
 # ─────────────────────────── Constants ────────────────────────────────────────
 
@@ -152,43 +148,37 @@ def ready() -> dict[str, Any]:
 # ─────────────────────────── Health Server ────────────────────────────────────
 
 
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:
-        if self.path in ("/", "/health", "/ready"):
-            body = json.dumps(
-                {
-                    "status": "ok",
-                    "ready": True,
-                    "logged_in": _session.logged_in,
-                    "client_ready": _session.client is not None and not _session.client.is_closed,
-                }
-            ).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+async def app(scope, receive, send):
+    """ASGI app that handles health checks and delegates MCP to FastMCP."""
+    if scope["type"] == "http":
+        path = scope["path"]
+
+        # Health check endpoints
+        if path in ("/", "/health", "/ready"):
+            body = json.dumps({
+                "status": "ok",
+                "ready": True,
+                "logged_in": _session.logged_in,
+                "client_ready": _session.client is not None and not _session.client.is_closed,
+            }).encode("utf-8")
+
+            await send({
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [[b"content-type", b"application/json"]],
+            })
+            await send({
+                "type": "http.response.body",
+                "body": body,
+            })
             return
 
-        body = b"not found\n"
-        self.send_response(404)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, format: str, *args: Any) -> None:
-        return
-
-
-def run_health_server() -> None:
-    server = ThreadingHTTPServer((HEALTH_HOST, HEALTH_PORT), HealthHandler)
-    server.serve_forever()
+    # Delegate everything else to MCP
+    await mcp(scope, receive, send)
 
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(mcp, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
