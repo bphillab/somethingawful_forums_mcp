@@ -501,50 +501,58 @@ async def sa_list_forums(params: ListForumsInput) -> str:
         - "List all forums" → call with default params
     """
     try:
-        resp = await _session.get(f"{BASE_URL}")
+        resp = await _session.get(f"{BASE_URL}/index.php")
         resp.raise_for_status()
     except Exception as e:
         return _handle_error(e)
 
     soup = _soup(resp.text)
+    forums_table = soup.select_one("table#forums")
+    if not forums_table:
+        return "No forums found. The SA index layout may have changed."
+
     categories: List[Dict[str, Any]] = []
+    current_category = "General"
+    current_forums: List[Dict[str, Any]] = []
 
-    # SA forums index: categories are in <div class="category"> or table-based layout
-    # Try modern div-based layout first, then fall back to table
-    category_els = soup.select("div.category, table.category")
+    for row in forums_table.select("tr"):
+        category_el = row.select_one("th.category")
+        if category_el:
+            if current_forums:
+                categories.append(
+                    {"category": current_category, "forums": current_forums}
+                )
+                current_forums = []
+            current_category = _text(category_el)
+            continue
 
-    if not category_els:
-        # Fallback: look for any h2/h3 headings that separate forum groups
-        category_els = soup.select(".forums")
+        forum_link = row.select_one("a.forum[href*='forumdisplay.php']")
+        if not forum_link:
+            continue
 
-    for cat_el in category_els:
-        cat_name_el = cat_el.select_one("h2, h3, .title, th")
-        cat_name = _text(cat_name_el) if cat_name_el else "General"
+        href = _attr(forum_link, "href")
+        fid_match = re.search(r"forumid=(\d+)", href)
+        if not fid_match:
+            continue
 
-        forums_in_cat: List[Dict[str, Any]] = []
-        for row in cat_el.select("tr.forum, .forum-row, tr[id]"):
-            link = row.select_one("a[href*='forumdisplay.php']")
-            if not link:
-                continue
-            href = _attr(link, "href")
-            fid_match = re.search(r"forumid=(\d+)", href)
-            if not fid_match:
-                continue
-            fid = int(fid_match.group(1))
-            fname = _text(link)
-            desc_el = row.select_one(".description, .forumdesc, td:nth-child(2)")
-            fdesc = _text(desc_el) if desc_el else ""
-            # Thread/post counts
-            counts = row.select("td.count, td.threadcount, td.postcount, td:nth-child(3), td:nth-child(4)")
-            threads = _text(counts[0]) if len(counts) > 0 else ""
-            posts = _text(counts[1]) if len(counts) > 1 else ""
+        fid = int(fid_match.group(1))
+        fname = _text(forum_link)
 
-            forums_in_cat.append(
-                {"id": fid, "name": fname, "description": fdesc, "threads": threads, "posts": posts}
-            )
+        desc_el = row.select_one("span.forumdesc")
+        fdesc = _text(desc_el).lstrip(" -").strip() if desc_el else ""
 
-        if forums_in_cat:
-            categories.append({"category": cat_name, "forums": forums_in_cat})
+        current_forums.append(
+            {
+                "id": fid,
+                "name": fname,
+                "description": fdesc,
+                "threads": "",
+                "posts": "",
+            }
+        )
+
+    if current_forums:
+        categories.append({"category": current_category, "forums": current_forums})
 
     if not categories:
         return (
