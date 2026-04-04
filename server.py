@@ -120,7 +120,7 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 def start_health_server():
     """Start health check server in background thread."""
-    server = HTTPServer(("0.0.0.0", 8000), HealthHandler)
+    server = HTTPServer(("0.0.0.0", 8080), HealthHandler)
     thread = Thread(daemon=True, target=server.serve_forever)
     thread.start()
     print("Health check server started on port 8000")
