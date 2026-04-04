@@ -1672,8 +1672,14 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
             lines.append(f"> {t['context']}")
         lines.append("")
     return "\n".join(lines)
-
-
+############### Health Check ##################
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request):
+    from starlette.responses import JSONResponse
+    return JSONResponse({"status": "ok", "logged_in": _session.logged_in})
+################################
+########### main##############
 if __name__ == "__main__":
-    start_health_server()  # Add this line
-    mcp.run(transport="streamable-http")
+    import os
+    port = int(os.environ.get("PORT", 8080))
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
