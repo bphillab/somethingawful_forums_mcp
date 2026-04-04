@@ -20,7 +20,13 @@ from typing import Any, Optional
 import httpx
 from bs4 import BeautifulSoup
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from mcp.server.fastmcp import FastMCP
+import contextlib
+from starlette.applications import Starlette
+from starlette.routing import Mount
+from mcp.server.fastmcp import FastMCP
+
 
 
 # ─────────────────────────── Constants ────────────────────────────────────────
@@ -129,9 +135,7 @@ async def app_lifespan(server):
 
 
 # ─────────────────────────── MCP Server ───────────────────────────────────────
-
 mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
-
 @mcp.tool()
 def health() -> dict[str, Any]:
     """Check the health of the MCP server and session."""
@@ -143,13 +147,20 @@ def health() -> dict[str, Any]:
     }
 
 # Add your other @mcp.tool() methods here
+@contextlib.asynccontextmanager
+async def lifespan(app: Starlette):
+    async with mcp.session_manager.run():
+        yield
 
+app = Starlette(
+    routes=[
+        Mount("/", app=mcp.streamable_http_app()),
+    ],
+    lifespan=lifespan,
+)
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
 if __name__ == "__main__":
     import uvicorn
-    # Create a wrapper ASGI app
-    app = FastAPI()
-    app.mount("/", mcp.streamable_http_app())
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
