@@ -148,6 +148,5 @@ def health() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import uvicorn
-    # Get the underlying ASGI app
-    asgi_app = mcp.app if hasattr(mcp, 'app') else mcp._app
-    uvicorn.run(asgi_app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+    # FastMCP is an ASGI app itself when you call it
+    uvicorn.run("server:mcp", host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
