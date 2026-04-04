@@ -137,7 +137,7 @@ def start_health_server():
 
 # ─────────────────────────── MCP Server ───────────────────────────────────────
 
-server = FastMCP("sa_forums_mcp", lifespan=app_lifespan,settings=settings)
+server = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
 server.settings.transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=False,
 )
