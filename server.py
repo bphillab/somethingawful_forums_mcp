@@ -18,6 +18,9 @@ from typing import Any, Optional
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route, Mount
+from fastapi import FastAPI
+from starlette.middleware.wsgi import WSGIMiddleware
+
 
 import httpx
 from bs4 import BeautifulSoup
@@ -146,10 +149,29 @@ async def ready_endpoint(request):
     })
 # ─────────────────────────── MCP Server ───────────────────────────────────────
 
-mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
 
-@mcp.tool()
+
+
+# ─────────────────────────── Starlette App ────────────────────────────────────
+app = FastAPI()
+# Health checks
+@app.get("/health")
 def health() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "ready": True,
+        "logged_in": _session.logged_in,
+        "client_ready": _session.client is not None and not _session.client.is_closed,
+    }
+
+@app.get("/ready")
+def ready() -> dict[str, Any]:
+    return health()
+
+# MCP server
+mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
+@mcp.tool()
+def health_tool() -> dict[str, Any]:
     """Check the health of the MCP server and session."""
     return {
         "status": "ok",
@@ -158,23 +180,9 @@ def health() -> dict[str, Any]:
         "client_ready": _session.client is not None and not _session.client.is_closed,
     }
 
-@mcp.tool()
-def ready() -> dict[str, Any]:
-    """Check if the server is ready to handle requests."""
-    return health()
+# Mount MCP at /mcp
+app.mount("/mcp", mcp.streamable_http_app())
 
-
-# Mount MCP at root - it will handle all other requests
-
-# ─────────────────────────── Starlette App ────────────────────────────────────
-
-routes = [
-    Route("/health", health_endpoint),
-    Route("/ready", ready_endpoint),
-    Mount("/", mcp.streamable_http_app()),
-]
-
-app = Starlette(routes=routes, lifespan=app_lifespan)
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
