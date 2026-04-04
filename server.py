@@ -1,15 +1,7 @@
 #!/usr/bin/env python3
 """
 MCP Server for Something Awful Forums.
-
-This server provides tools to interact with the Something Awful Forums
-(forums.somethingawful.com), including reading threads and posts, browsing
-forums, searching, viewing user profiles, and managing private messages.
-
-Authentication uses your SA username and password, stored as environment
-variables SA_USERNAME and SA_PASSWORD.
 """
-
 
 import asyncio
 import json
@@ -19,25 +11,17 @@ from typing import Any, Optional
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
 from mcp.server.fastmcp import FastMCP
 import contextlib
 from starlette.applications import Starlette
 from starlette.routing import Mount
-from mcp.server.fastmcp import FastMCP
-
-
 
 # ─────────────────────────── Constants ────────────────────────────────────────
-
 
 BASE_URL = "https://forums.somethingawful.com"
 LOGIN_URL = f"{BASE_URL}/account.php"
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_PER_PAGE = 40
-HEALTH_HOST = "0.0.0.0"
-HEALTH_PORT = int(os.environ.get("PORT", "8080"))
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -45,7 +29,6 @@ USER_AGENT = (
 )
 
 # ─────────────────────────── Session State ────────────────────────────────────
-
 
 class SASession:
     """Manages the authenticated HTTP session for Something Awful Forums."""
@@ -86,16 +69,13 @@ class SASession:
                     "next": "/",
                 },
             )
-            # Check if login was successful by looking for a logged-in indicator
             if "logout" in response.text.lower() or "logoutconfirm" in response.url.path:
                 self.logged_in = True
                 return "ok"
-            # Check for error message in response
             soup = BeautifulSoup(response.text, "html.parser")
             error_el = soup.select_one(".error, .standard-error, #loginform .error")
             if error_el:
                 return f"Error: Login failed — {error_el.get_text(strip=True)}"
-            # If we were redirected away from login, assume success
             if "account.php" not in str(response.url):
                 self.logged_in = True
                 return "ok"
@@ -117,25 +97,22 @@ class SASession:
         if self.client and not self.client.is_closed:
             await self.client.aclose()
 
-
-# Global session object, shared across requests
 _session = SASession()
-
 
 # ─────────────────────────── Lifespan ─────────────────────────────────────────
 
-
 @asynccontextmanager
-async def app_lifespan(server):
-    """Initialize the HTTP client on startup, clean up on shutdown."""
+async def lifespan(app: Starlette):
+    """Manage both SA session and MCP session manager."""
     await _session.ensure_client()
-    yield {}
+    async with mcp.session_manager.run():
+        yield
     await _session.close()
 
-
-
 # ─────────────────────────── MCP Server ───────────────────────────────────────
-mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
+
+mcp = FastMCP("sa_forums_mcp")
+
 @mcp.tool()
 def health() -> dict[str, Any]:
     """Check the health of the MCP server and session."""
@@ -146,11 +123,7 @@ def health() -> dict[str, Any]:
         "client_ready": _session.client is not None and not _session.client.is_closed,
     }
 
-# Add your other @mcp.tool() methods here
-@contextlib.asynccontextmanager
-async def lifespan(app: Starlette):
-    async with mcp.session_manager.run():
-        yield
+# ─────────────────────────── Starlette App ────────────────────────────────────
 
 app = Starlette(
     routes=[
