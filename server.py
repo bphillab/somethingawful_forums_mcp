@@ -14,13 +14,13 @@ import asyncio
 import json
 import os
 import re
-import threading
 from contextlib import asynccontextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, List, Optional
 
 import httpx
 from bs4 import BeautifulSoup, Tag
+from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP, Context
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -171,13 +171,6 @@ def run_health_server() -> None:
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
 if __name__ == "__main__":
-    print(f"Starting health server on {HEALTH_HOST}:{HEALTH_PORT}", flush=True)
-    health_thread = threading.Thread(target=run_health_server, daemon=False)
-    health_thread.start()
-
-    # Give the health server a moment to bind before MCP startup continues.
-    # This helps avoid probe races in fast-failing container environments.
-    import time
-    time.sleep(0.5)
-
-    mcp.run()
+    # Start the MCP server in HTTP mode instead of stdio.
+    # Exact transport argument may vary by mcp version.
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8080)
