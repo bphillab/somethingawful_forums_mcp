@@ -35,7 +35,7 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/120.0.0.0 Safari/537.36"
 )
-HEALTH_HOST = "0.0.0.0"
+HEALTH_HOST = "100.127.31.228"
 HEALTH_PORT = 8080
 
 # ─────────────────────────── Session State ────────────────────────────────────
