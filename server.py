@@ -19,6 +19,7 @@ from typing import Any, Optional
 
 import httpx
 from bs4 import BeautifulSoup
+from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 
 
@@ -148,5 +149,7 @@ def health() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import uvicorn
-    # FastMCP is an ASGI app itself when you call it
-    uvicorn.run("server:mcp", host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+    # Create a wrapper ASGI app
+    app = FastAPI()
+    app.mount("/", mcp.streamable_http_app())
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
