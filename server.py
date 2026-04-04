@@ -155,8 +155,8 @@ async def app(scope, receive, send):
     if scope["type"] == "http":
         path = scope["path"]
 
-        # Health check endpoints
-        if path in ("/", "/health", "/ready"):
+        # Health check endpoints - ONLY these exact paths
+        if path == "/health" or path == "/ready":
             body = json.dumps({
                 "status": "ok",
                 "ready": True,
@@ -175,9 +175,12 @@ async def app(scope, receive, send):
             })
             return
 
-    # Delegate everything else to MCP
-    await mcp_asgi(scope, receive, send)
+        # Everything else goes to MCP (including /)
+        # Debug: log what we're delegating
+        print(f"Delegating {scope['method']} {path} to MCP")
 
+    # Delegate to MCP
+    await mcp_asgi(scope, receive, send)
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
