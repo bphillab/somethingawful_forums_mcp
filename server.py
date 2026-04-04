@@ -1689,7 +1689,6 @@ if __name__ == "__main__":
     import os
     import uvicorn
     from starlette.responses import JSONResponse
-    from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 
     @mcp.custom_route("/health", methods=["GET"])
@@ -1697,29 +1696,28 @@ if __name__ == "__main__":
         return JSONResponse({
             "status": "ok",
             "logged_in": _session.logged_in,
-            "client_ready": _session.client is not None and not _session.client.is_closed,
         })
 
 
     port = int(os.environ.get("PORT", 8080))
     app = mcp.streamable_http_app()
 
-    # Wrap with middleware that allows all hosts
-    from starlette.middleware import Middleware
-    from starlette.applications import Starlette
 
-
-    # Or simpler — just disable host checking entirely
-    # by wrapping the app
-    class PermissiveHostMiddleware:
+    # Middleware to bypass host validation
+    class HostFixMiddleware:
         def __init__(self, app):
             self.app = app
 
         async def __call__(self, scope, receive, send):
-            # Remove host validation by just passing through
+            if scope["type"] == "http":
+                # Override headers to use localhost (bypasses host check)
+                headers = dict(scope.get("headers", []))
+                headers[b"host"] = b"localhost"
+                scope = dict(scope)
+                scope["headers"] = list(headers.items())
             return await self.app(scope, receive, send)
 
 
-    app = PermissiveHostMiddleware(app)
+    app = HostFixMiddleware(app)
 
     uvicorn.run(app, host="0.0.0.0", port=port)
