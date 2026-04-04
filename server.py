@@ -147,16 +147,13 @@ def ready() -> dict[str, Any]:
 
 # ─────────────────────────── Custom ASGI Wrapper ────────────────────────────
 
-mcp_asgi = mcp.streamable_http_app()
-
-
 async def app(scope, receive, send):
     """ASGI app that handles health checks and delegates MCP to FastMCP."""
     if scope["type"] == "http":
         path = scope["path"]
 
-        # Health check endpoints - ONLY these exact paths
-        if path == "/health" or path == "/ready":
+        # Health check endpoints
+        if path in ("/health", "/ready"):
             body = json.dumps({
                 "status": "ok",
                 "ready": True,
@@ -175,12 +172,8 @@ async def app(scope, receive, send):
             })
             return
 
-        # Everything else goes to MCP (including /)
-        # Debug: log what we're delegating
-        print(f"Delegating {scope['method']} {path} to MCP")
-
-    # Delegate to MCP
-    await mcp_asgi(scope, receive, send)
+    # Delegate everything else to MCP
+    await mcp(scope, receive, send)
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
