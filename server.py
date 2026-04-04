@@ -1673,6 +1673,12 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         lines.append("")
     return "\n".join(lines)
 ############### Health Check ##################
+from starlette.routing import Route
+from starlette.responses import JSONResponse
+
+async def health(request):
+    return JSONResponse({"status": "ok", "logged_in": _session.logged_in})
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request):
     from starlette.responses import JSONResponse
@@ -1681,6 +1687,12 @@ async def health_check(request):
 ########### main##############
 if __name__ == "__main__":
     import os
-    os.environ["UVICORN_HOST"] = "0.0.0.0"
-    os.environ["UVICORN_PORT"] = os.environ.get("PORT", "8080")
-    mcp.run(transport="streamable-http")
+    import uvicorn
+
+    app = mcp.get_app()  # or however FastMCP exposes its ASGI app
+
+    # Add health route
+    app.routes.append(Route("/health", health, methods=["GET"]))
+
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
