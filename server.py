@@ -151,12 +151,11 @@ def ready() -> dict[str, Any]:
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"status": "ok", "health": "/health", "mcp": "mounted at /"}
+    return {"status": "ok", "health": "/health", "mcp": "/mcp"}
 
 
-# Mount MCP at the root path so the service is exposed as "/"
-# and not under a separate /mcp prefix.
-app.mount("/", mcp.streamable_http_app())
+# Mount MCP under /mcp so clients can connect to a dedicated transport URL.
+app.mount("/mcp", mcp.streamable_http_app())
 
 # ─────────────────────────── Health Server ────────────────────────────────────
 
