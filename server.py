@@ -11,10 +11,15 @@ from contextlib import asynccontextmanager
 from threading import Thread
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Optional, List, Dict
+from mcp.server.fastmcp.server import Settings
+from mcp.server.transport_security import TransportSecuritySettings
 
 import httpx
 from bs4 import BeautifulSoup
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.server import Settings
+from mcp.server.transport_security import TransportSecuritySettings
+
 from pydantic import BaseModel, ConfigDict, Field, Tag
 
 BASE_URL = "https://forums.somethingawful.com"
@@ -26,6 +31,16 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/120.0.0.0 Safari/537.36"
 )
+
+settings = Settings(
+    host="0.0.0.0",
+    port=8080,
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    ),
+)
+
+
 class SASession:
     """Manages the authenticated HTTP session for Something Awful Forums."""
 
@@ -128,9 +143,9 @@ def start_health_server():
 
 # ─────────────────────────── MCP Server ───────────────────────────────────────
 
-mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
+server = FastMCP("sa_forums_mcp", lifespan=app_lifespan,settings=settings)
 
-@mcp.tool()
+@server.tool()
 def health() -> dict[str, Any]:
     """Check the health of the MCP server and session."""
     return {
@@ -432,7 +447,7 @@ class ListUserCPThreadsInput(BaseModel):
 # ─────────────────────────── Tools ────────────────────────────────────────────
 
 
-@mcp.tool(
+@server.tool(
     name="sa_login",
     annotations={
         "title": "Log in to Something Awful",
@@ -469,7 +484,7 @@ async def sa_login(params: LoginInput=LoginInput()) -> str:
     return result
 
 
-@mcp.tool(
+@server.tool(
     name="sa_list_forums",
     annotations={
         "title": "List SA Forums",
@@ -592,7 +607,7 @@ async def sa_list_forums(params: ListForumsInput) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool(
+@server.tool(
     name="sa_list_threads",
     annotations={
         "title": "List Threads in a Forum",
@@ -778,7 +793,7 @@ async def sa_list_threads(params: ListThreadsInput) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool(
+@server.tool(
     name="sa_get_thread",
     annotations={
         "title": "Read Thread Posts",
@@ -923,7 +938,7 @@ async def sa_get_thread(params: GetThreadInput) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool(
+@server.tool(
     name="sa_search",
     annotations={
         "title": "Search SA Forums",
@@ -1101,7 +1116,7 @@ async def sa_search(params: SearchInput) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool(
+@server.tool(
     name="sa_get_user",
     annotations={
         "title": "Get SA User Profile",
@@ -1244,7 +1259,7 @@ async def sa_get_user(params: GetUserInput) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool(
+@server.tool(
     name="sa_list_pms",
     annotations={
         "title": "List SA Private Messages",
@@ -1392,7 +1407,7 @@ async def sa_list_pms(params: ListPMsInput) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool(
+@server.tool(
     name="sa_get_pm",
     annotations={
         "title": "Read a SA Private Message",
@@ -1506,7 +1521,7 @@ async def sa_get_pm(params: GetPMInput) -> str:
     lines.append("\n---\n")
     lines.append(body or "*(empty message)*")
     return "\n".join(lines)
-@mcp.tool(
+@server.tool(
     name="sa_list_usercp_threads",
     annotations={
         "title": "List Threads on User Control Panel",
@@ -1679,7 +1694,7 @@ from starlette.responses import JSONResponse
 async def health(request):
     return JSONResponse({"status": "ok", "logged_in": _session.logged_in})
 
-@mcp.custom_route("/health", methods=["GET"])
+@server.custom_route("/health", methods=["GET"])
 async def health_check(request):
     from starlette.responses import JSONResponse
     return JSONResponse({"status": "ok", "logged_in": _session.logged_in})
@@ -1690,34 +1705,14 @@ if __name__ == "__main__":
     import uvicorn
     from starlette.responses import JSONResponse
 
-
-    @mcp.custom_route("/health", methods=["GET"])
+    @server.custom_route("/health", methods=["GET"])
     async def health(request):
         return JSONResponse({
             "status": "ok",
             "logged_in": _session.logged_in,
+            "client_ready": _session.client is not None and not _session.client.is_closed,
         })
 
-
     port = int(os.environ.get("PORT", 8080))
-    app = mcp.streamable_http_app()
-
-
-    # Middleware to bypass host validation
-    class HostFixMiddleware:
-        def __init__(self, app):
-            self.app = app
-
-        async def __call__(self, scope, receive, send):
-            if scope["type"] == "http":
-                # Override headers to use localhost (bypasses host check)
-                headers = dict(scope.get("headers", []))
-                headers[b"host"] = b"localhost"
-                scope = dict(scope)
-                scope["headers"] = list(headers.items())
-            return await self.app(scope, receive, send)
-
-
-    app = HostFixMiddleware(app)
-
+    app = server.streamable_http_app()
     uvicorn.run(app, host="0.0.0.0", port=port)
