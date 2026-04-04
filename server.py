@@ -1688,11 +1688,16 @@ async def health_check(request):
 if __name__ == "__main__":
     import os
     import uvicorn
-
-    app = mcp.get_app()  # or however FastMCP exposes its ASGI app
-
-    # Add health route
-    app.routes.append(Route("/health", health, methods=["GET"]))
+    from mcp.server.fastmcp import FastMCP
 
     port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+
+    # FastMCP.run() likely calls uvicorn internally
+    # Let's bypass and get the ASGI app directly
+    app = mcp.sse_app() if hasattr(mcp, 'sse_app') else mcp.http_app() if hasattr(mcp, 'http_app') else None
+
+    if app:
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    else:
+        # Fallback — just run and hope PORT env var works
+        mcp.run(transport="streamable-http")
