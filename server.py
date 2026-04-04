@@ -11,22 +11,16 @@ variables SA_USERNAME and SA_PASSWORD.
 """
 
 
+import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
 from typing import Any, Optional
-from starlette.applications import Starlette
-from starlette.responses import JSONResponse
-from starlette.routing import Route, Mount
-from fastapi import FastAPI
-from starlette.middleware.wsgi import WSGIMiddleware
-
-from mcp.server.fastmcp import FastMCP
-
 
 import httpx
 from bs4 import BeautifulSoup
 from mcp.server.fastmcp import FastMCP
+
 
 # ─────────────────────────── Constants ────────────────────────────────────────
 
@@ -132,46 +126,11 @@ async def app_lifespan(server):
     await _session.close()
 
 
-# ─────────────────────────── Health Routes ────────────────────────────────────
 
-async def health_endpoint(request):
-    return JSONResponse({
-        "status": "ok",
-        "ready": True,
-        "logged_in": _session.logged_in,
-        "client_ready": _session.client is not None and not _session.client.is_closed,
-    })
-
-async def ready_endpoint(request):
-    return JSONResponse({
-        "status": "ok",
-        "ready": True,
-        "logged_in": _session.logged_in,
-        "client_ready": _session.client is not None and not _session.client.is_closed,
-    })
 # ─────────────────────────── MCP Server ───────────────────────────────────────
 
-
-
-
-# ─────────────────────────── Starlette App ────────────────────────────────────
-app = FastAPI()
-# Health checks
-@app.get("/health")
-def health() -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "ready": True,
-        "logged_in": _session.logged_in,
-        "client_ready": _session.client is not None and not _session.client.is_closed,
-    }
-
-@app.get("/ready")
-def ready() -> dict[str, Any]:
-    return health()
-
-# MCP server
 mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
+
 @mcp.tool()
 def health() -> dict[str, Any]:
     """Check the health of the MCP server and session."""
@@ -182,14 +141,11 @@ def health() -> dict[str, Any]:
         "client_ready": _session.client is not None and not _session.client.is_closed,
     }
 
-
-# Mount MCP at /mcp
-app.mount("/mcp", mcp.streamable_http_app())
+# Add your other @mcp.tool() methods here
 
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
 if __name__ == "__main__":
     import uvicorn
-    # Run MCP directly - it IS an ASGI app
     uvicorn.run(mcp, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
