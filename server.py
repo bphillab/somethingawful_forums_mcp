@@ -15,6 +15,9 @@ import json
 import os
 from contextlib import asynccontextmanager
 from typing import Any, Optional
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Route, Mount
 
 import httpx
 from bs4 import BeautifulSoup
@@ -146,6 +149,8 @@ def ready() -> dict[str, Any]:
 # Mount MCP at root - it will handle all other requests
 
 # ─────────────────────────── Custom ASGI Wrapper ────────────────────────────
+# Create the ASGI app from FastMCP
+mcp_app = mcp.streamable_http_app()
 
 async def app(scope, receive, send):
     """ASGI app that handles health checks and delegates MCP to FastMCP."""
@@ -172,8 +177,8 @@ async def app(scope, receive, send):
             })
             return
 
-    # Delegate everything else to MCP
-    await mcp(scope, receive, send)
+    # Delegate everything else to MCP's ASGI app
+    await mcp_app(scope, receive, send)
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
