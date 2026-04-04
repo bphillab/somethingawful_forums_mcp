@@ -155,8 +155,8 @@ def root() -> dict[str, str]:
 
 
 # Mount the MCP ASGI app under /mcp.
-# Different mcp versions name this differently; http_app() is the common one.
-app.mount("/mcp", mcp.http_app())
+# FastMCP v2-style HTTP transport uses streamable HTTP.
+app.mount("/mcp", mcp.streamable_http_app())
 
 # ─────────────────────────── Health Server ────────────────────────────────────
 
