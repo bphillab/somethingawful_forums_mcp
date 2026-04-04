@@ -171,6 +171,7 @@ def run_health_server() -> None:
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
 if __name__ == "__main__":
+    print(f"Starting health server on {HEALTH_HOST}:{HEALTH_PORT}", flush=True)
     health_thread = threading.Thread(target=run_health_server, daemon=False)
     health_thread.start()
 
