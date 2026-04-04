@@ -1675,8 +1675,10 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
 
 
 if __name__ == "__main__":
+    import uvicorn
+
     # Start health check server in background
     start_health_server()
 
     # Run MCP server on port 8080
-    mcp.run(transport="streamable-http", port=8080)
+    uvicorn.run(mcp, host="0.0.0.0", port=8080)
