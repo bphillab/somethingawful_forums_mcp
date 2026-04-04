@@ -21,6 +21,8 @@ from starlette.routing import Route, Mount
 from fastapi import FastAPI
 from starlette.middleware.wsgi import WSGIMiddleware
 
+from mcp.server.fastmcp import FastMCP
+
 
 import httpx
 from bs4 import BeautifulSoup
@@ -171,7 +173,7 @@ def ready() -> dict[str, Any]:
 # MCP server
 mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
 @mcp.tool()
-def health_tool() -> dict[str, Any]:
+def health() -> dict[str, Any]:
     """Check the health of the MCP server and session."""
     return {
         "status": "ok",
@@ -179,6 +181,7 @@ def health_tool() -> dict[str, Any]:
         "logged_in": _session.logged_in,
         "client_ready": _session.client is not None and not _session.client.is_closed,
     }
+
 
 # Mount MCP at /mcp
 app.mount("/mcp", mcp.streamable_http_app())
@@ -188,4 +191,5 @@ app.mount("/mcp", mcp.streamable_http_app())
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+    # Run MCP directly - it IS an ASGI app
+    uvicorn.run(mcp, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
