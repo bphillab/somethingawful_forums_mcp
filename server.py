@@ -1672,4 +1672,4 @@ if __name__ == "__main__":
     # Just use stdio transport (for Claude desktop/local)
     import asyncio
 
-    asyncio.run(mcp.run())
+    mcp.run()
