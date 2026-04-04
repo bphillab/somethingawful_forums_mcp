@@ -1688,16 +1688,17 @@ async def health_check(request):
 if __name__ == "__main__":
     import os
     import uvicorn
-    from mcp.server.fastmcp import FastMCP
+    from starlette.responses import JSONResponse
+
+    # Add health route directly to FastMCP
+    @mcp.custom_route("/health", methods=["GET"])
+    async def health(request):
+        return JSONResponse({
+            "status": "ok",
+            "logged_in": _session.logged_in,
+            "client_ready": _session.client is not None and not _session.client.is_closed,
+        })
 
     port = int(os.environ.get("PORT", 8080))
-
-    # FastMCP.run() likely calls uvicorn internally
-    # Let's bypass and get the ASGI app directly
-    app = mcp.sse_app() if hasattr(mcp, 'sse_app') else mcp.http_app() if hasattr(mcp, 'http_app') else None
-
-    if app:
-        uvicorn.run(app, host="0.0.0.0", port=port)
-    else:
-        # Fallback — just run and hope PORT env var works
-        mcp.run(transport="streamable-http")
+    app = mcp.streamable_http_app()
+    uvicorn.run(app, host="0.0.0.0", port=port)
