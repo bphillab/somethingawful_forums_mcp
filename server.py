@@ -1675,4 +1675,5 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
 
 
 if __name__ == "__main__":
+    start_health_server()  # Add this line
     mcp.run(transport="streamable-http")
