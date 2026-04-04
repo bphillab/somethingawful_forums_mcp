@@ -11,6 +11,7 @@ variables SA_USERNAME and SA_PASSWORD.
 """
 
 
+
 import asyncio
 import json
 import os
@@ -19,12 +20,6 @@ from typing import Any, Optional
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
-from mcp.server.fastmcp import FastMCP
-import contextlib
-from starlette.applications import Starlette
-from starlette.routing import Mount
 from mcp.server.fastmcp import FastMCP
 
 
@@ -120,10 +115,7 @@ class SASession:
 
 # Global session object, shared across requests
 _session = SASession()
-
-
 # ─────────────────────────── Lifespan ─────────────────────────────────────────
-
 
 @asynccontextmanager
 async def app_lifespan(server):
@@ -134,8 +126,12 @@ async def app_lifespan(server):
 
 
 
+
+
+
 # ─────────────────────────── MCP Server ───────────────────────────────────────
 mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
+@mcp.tool()
 @mcp.tool()
 def health() -> dict[str, Any]:
     """Check the health of the MCP server and session."""
@@ -146,21 +142,7 @@ def health() -> dict[str, Any]:
         "client_ready": _session.client is not None and not _session.client.is_closed,
     }
 
-# Add your other @mcp.tool() methods here
-@contextlib.asynccontextmanager
-async def lifespan(app: Starlette):
-    async with mcp.session_manager.run():
-        yield
-
-app = Starlette(
-    routes=[
-        Mount("/", app=mcp.streamable_http_app()),
-    ],
-    lifespan=lifespan,
-)
-
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+    mcp.run(transport="streamable-http")
