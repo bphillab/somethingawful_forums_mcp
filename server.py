@@ -151,12 +151,12 @@ def ready() -> dict[str, Any]:
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"status": "ok", "mcp": "/mcp", "health": "/health"}
+    return {"status": "ok", "health": "/health", "mcp": "mounted at /"}
 
 
-# Mount the MCP ASGI app under /mcp.
-# FastMCP v2-style HTTP transport uses streamable HTTP.
-app.mount("/mcp", mcp.streamable_http_app())
+# Mount MCP at the root path so the service is exposed as "/"
+# and not under a separate /mcp prefix.
+app.mount("/", mcp.streamable_http_app())
 
 # ─────────────────────────── Health Server ────────────────────────────────────
 
