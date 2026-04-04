@@ -145,7 +145,9 @@ def ready() -> dict[str, Any]:
 
 # Mount MCP at root - it will handle all other requests
 
-# ─────────────────────────── Health Server ────────────────────────────────────
+# ─────────────────────────── Custom ASGI Wrapper ────────────────────────────
+
+mcp_asgi = mcp.streamable_http_app()
 
 
 async def app(scope, receive, send):
@@ -174,7 +176,7 @@ async def app(scope, receive, send):
             return
 
     # Delegate everything else to MCP
-    await mcp(scope, receive, send)
+    await mcp_asgi(scope, receive, send)
 
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
