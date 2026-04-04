@@ -127,7 +127,25 @@ async def app_lifespan(server):
     await _session.close()
 
 
+# ─────────────────────────── Health Routes ────────────────────────────────────
+
+async def health_endpoint(request):
+    return JSONResponse({
+        "status": "ok",
+        "ready": True,
+        "logged_in": _session.logged_in,
+        "client_ready": _session.client is not None and not _session.client.is_closed,
+    })
+
+async def ready_endpoint(request):
+    return JSONResponse({
+        "status": "ok",
+        "ready": True,
+        "logged_in": _session.logged_in,
+        "client_ready": _session.client is not None and not _session.client.is_closed,
+    })
 # ─────────────────────────── MCP Server ───────────────────────────────────────
+
 mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
 
 @mcp.tool()
@@ -148,37 +166,15 @@ def ready() -> dict[str, Any]:
 
 # Mount MCP at root - it will handle all other requests
 
-# ─────────────────────────── Custom ASGI Wrapper ────────────────────────────
-# Create the ASGI app from FastMCP
-mcp_app = mcp.streamable_http_app()
+# ─────────────────────────── Starlette App ────────────────────────────────────
 
-async def app(scope, receive, send):
-    """ASGI app that handles health checks and delegates MCP to FastMCP."""
-    if scope["type"] == "http":
-        path = scope["path"]
+routes = [
+    Route("/health", health_endpoint),
+    Route("/ready", ready_endpoint),
+    Mount("/", mcp.streamable_http_app()),
+]
 
-        # Health check endpoints
-        if path in ("/health", "/ready"):
-            body = json.dumps({
-                "status": "ok",
-                "ready": True,
-                "logged_in": _session.logged_in,
-                "client_ready": _session.client is not None and not _session.client.is_closed,
-            }).encode("utf-8")
-
-            await send({
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [[b"content-type", b"application/json"]],
-            })
-            await send({
-                "type": "http.response.body",
-                "body": body,
-            })
-            return
-
-    # Delegate everything else to MCP's ASGI app
-    await mcp_app(scope, receive, send)
+app = Starlette(routes=routes, lifespan=app_lifespan)
 
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
