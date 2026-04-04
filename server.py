@@ -311,6 +311,10 @@ class GetThreadInput(BaseModel):
         ge=1,
     )
     page: int = Field(default=1, description="Page of posts to fetch", ge=1)
+    last_page: bool = Field(
+        default=False,
+        description="If true, fetch the thread's last page instead of the page in 'page'.",
+    )
     goto_newpost: bool = Field(
         default=False,
         description="If true, follow the thread's goto=newpost link and fetch the page containing the first unread post.",
@@ -773,46 +777,27 @@ async def sa_get_thread(params: GetThreadInput) -> str:
         params (GetThreadInput): Input parameters containing:
             - thread_id (int): Thread ID from sa_list_threads (required)
             - page (int): Page of posts to fetch (default: 1)
+            - last_page (bool): If true, fetch the last page
             - response_format (str): 'markdown' (default) or 'json'
 
     Returns:
         str: Posts in the requested format.
-
-        Markdown format:
-            # Thread Title (page 1 of N)
-            ---
-            **username** | Post #123456 | Jan 1, 2024 10:00 AM
-            Post content text here...
-            ---
-
-        JSON format:
-        {
-          "thread_id": 456,
-          "thread_title": "Thread Title",
-          "page": 1,
-          "total_pages": 10,
-          "posts": [
-            {
-              "id": 123456,
-              "author": "username",
-              "author_id": 789,
-              "date": "Jan 1, 2024 10:00 AM",
-              "content": "Post text...",
-              "avatar_url": "https://..."
-            }
-          ]
-        }
-
-        Error response: "Error: <message>"
-
-    Examples:
-        - "Read the first page of thread 12345" → thread_id=12345
-        - "Show page 5 of thread 99999" → thread_id=99999, page=5
     """
-    url = (
-        f"{BASE_URL}/showthread.php"
-        f"?threadid={params.thread_id}&perpage={DEFAULT_PER_PAGE}&pagenumber={params.page}"
-    )
+    if params.goto_newpost:
+        url = (
+            f"{BASE_URL}/showthread.php"
+            f"?threadid={params.thread_id}&goto=newpost"
+        )
+    elif params.last_page:
+        url = (
+            f"{BASE_URL}/showthread.php"
+            f"?threadid={params.thread_id}&perpage={DEFAULT_PER_PAGE}&pagenumber=999999"
+        )
+    else:
+        url = (
+            f"{BASE_URL}/showthread.php"
+            f"?threadid={params.thread_id}&perpage={DEFAULT_PER_PAGE}&pagenumber={params.page}"
+        )
     try:
         resp = await _session.get(url)
         resp.raise_for_status()
@@ -826,6 +811,7 @@ async def sa_get_thread(params: GetThreadInput) -> str:
     thread_title = _text(title_el).replace(" - Something Awful Forums", "").strip()
 
     total_pages = _extract_page_count(soup)
+    effective_page = total_pages if params.last_page else params.page
 
     posts: List[Dict[str, Any]] = []
 
@@ -887,7 +873,7 @@ async def sa_get_thread(params: GetThreadInput) -> str:
 
     if not posts:
         return (
-            f"No posts found in thread {params.thread_id} page {params.page}. "
+            f"No posts found in thread {params.thread_id} page {effective_page}. "
             "Make sure you're logged in (sa_login) and the thread ID is correct."
         )
 
@@ -896,14 +882,14 @@ async def sa_get_thread(params: GetThreadInput) -> str:
             {
                 "thread_id": params.thread_id,
                 "thread_title": thread_title,
-                "page": params.page,
+                "page": effective_page,
                 "total_pages": total_pages,
                 "posts": posts,
             },
             indent=2,
         )
 
-    lines = [f"# {thread_title} (page {params.page} of {total_pages})\n"]
+    lines = [f"# {thread_title} (page {effective_page} of {total_pages})\n"]
     for p in posts:
         lines.append("---")
         pid_str = f" | Post #{p['id']}" if p["id"] else ""
@@ -1515,37 +1501,6 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
     Fetches https://forums.somethingawful.com/usercp.php and extracts any
     thread entries visible on the page, which commonly includes subscribed
     threads / watched threads / thread-related links.
-
-    Must be logged in (sa_login) to use this tool.
-
-    Args:
-        params (ListUserCPThreadsInput): Input parameters containing:
-            - response_format (str): 'markdown' (default) or 'json'
-
-    Returns:
-        str: Threads found on the user control panel page in the requested format.
-
-        Markdown format:
-            # User CP Threads
-            ## Thread Title (Thread ID: 12345)
-            - **Forum**: Forum Name | **Link**: https://... | **Last page**: https://...
-
-        JSON format:
-        {
-          "page": "usercp",
-          "threads": [
-            {
-              "thread_id": 12345,
-              "thread_title": "Thread Title",
-              "forum": "Forum Name",
-              "url": "https://forums.somethingawful.com/showthread.php?...",
-              "last_page_url": "https://forums.somethingawful.com/showthread.php?threadid=12345&...",
-              "context": "..."
-            }
-          ]
-        }
-
-        Error response: "Error: <message>"
     """
     url = f"{BASE_URL}/usercp.php"
     try:
@@ -1580,17 +1535,37 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         unread_count = 0
         unread_page = 0
         first_unread_post_id = 0
+        last_page_url = ""
+        last_page_num = 0
+        last_post_url = ""
 
         row = link.find_parent("tr")
         title = _extract_thread_title_from_row(row) if row is not None else ""
         if not title:
             title = _clean_thread_title(_text(link))
 
-        last_page_url = ""
         if row is not None:
             unread_url = _extract_unread_link_from_row(row)
             unread_count = _extract_unread_count_from_row(row)
-            last_page_url = _extract_last_page_url_from_row(row)
+
+            # Prefer a direct last-post jump if present
+            lastpost_link = row.select_one("a[href*='goto=lastpost']")
+            if lastpost_link:
+                last_post_url = f"{BASE_URL}/{_attr(lastpost_link, 'href').lstrip('/')}"
+
+            # Otherwise fall back to the highest page number link
+            page_links = row.select("a[href*='pagenumber=']")
+            for a in page_links:
+                page_href = _attr(a, "href")
+                page_match = re.search(r"pagenumber=(\d+)", page_href)
+                if page_match:
+                    page_num = int(page_match.group(1))
+                    if page_num > last_page_num:
+                        last_page_num = page_num
+                        last_page_url = f"{BASE_URL}/{page_href.lstrip('/')}"
+
+            if not last_post_url:
+                last_post_url = last_page_url
 
         if unread_url:
             try:
@@ -1635,6 +1610,8 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
                 "forum": forum_name,
                 "url": f"{BASE_URL}/{href.lstrip('/')}",
                 "last_page_url": last_page_url,
+                "last_page_num": last_page_num,
+                "last_post_url": last_post_url,
                 "context": context,
                 "unread_count": unread_count,
                 "unread_url": unread_url,
@@ -1659,8 +1636,10 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         if t["forum"]:
             meta_parts.append(f"**Forum**: {t['forum']}")
         meta_parts.append(f"**Link**: {t['url']}")
-        if t["last_page_url"]:
-            meta_parts.append(f"**Last page**: {t['last_page_url']}")
+        if t["last_page_num"]:
+            meta_parts.append(f"**Last page**: {t['last_page_num']}")
+        if t["last_post_url"]:
+            meta_parts.append(f"**Last post**: {t['last_post_url']}")
         if t["unread_url"]:
             meta_parts.append(f"**Unread link**: {t['unread_url']}")
         if t["unread_page"]:
