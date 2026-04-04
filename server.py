@@ -133,7 +133,11 @@ mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
 
 app = FastAPI()
 
+mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
 
+app = FastAPI()
+
+# Define specific health check routes FIRST
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {
@@ -143,18 +147,11 @@ def health() -> dict[str, Any]:
         "client_ready": _session.client is not None and not _session.client.is_closed,
     }
 
-
 @app.get("/ready")
 def ready() -> dict[str, Any]:
     return health()
 
-
-@app.get("/")
-def root() -> dict[str, str]:
-    return {"status": "ok", "health": "/health", "mcp": "/"}
-
-
-# Mount MCP at the root path.
+# Mount MCP at root - it will handle all other requests
 app.mount("/", mcp.streamable_http_app())
 
 # ─────────────────────────── Health Server ────────────────────────────────────
