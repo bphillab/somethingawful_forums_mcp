@@ -1664,4 +1664,12 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
 if __name__ == "__main__":
-    mcp.run()
+    import uvicorn
+    from mcp.server import Server
+    from mcp.server.stdio import stdio_server
+
+    # FastMCP runs via stdio, but for HTTP we need a different approach
+    # Just use stdio transport (for Claude desktop/local)
+    import asyncio
+
+    asyncio.run(mcp.run())
