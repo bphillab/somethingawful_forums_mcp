@@ -1,0 +1,11 @@
+name: sa-forums-mcp
+services:
+- name: mcp-server
+  github:
+    repo: bphillab/somethingawful_forums_mcp
+    branch: main
+  build_command: pip install -r requirements.txt
+  run_command: uvicorn server:mcp --host 0.0.0.0 --port 8080
+  http_port: 8080
+  health_check:
+    http_path: /health
