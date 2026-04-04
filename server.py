@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # ─────────────────────────── Constants ────────────────────────────────────────
 
+
 BASE_URL = "https://forums.somethingawful.com"
 LOGIN_URL = f"{BASE_URL}/account.php"
 DEFAULT_TIMEOUT = 30.0
@@ -128,18 +129,11 @@ async def app_lifespan(server):
 
 
 # ─────────────────────────── MCP Server ───────────────────────────────────────
-
 mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
 
-app = FastAPI()
-
-mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
-
-app = FastAPI()
-
-# Define specific health check routes FIRST
-@app.get("/health")
+@mcp.tool()
 def health() -> dict[str, Any]:
+    """Check the health of the MCP server and session."""
     return {
         "status": "ok",
         "ready": True,
@@ -147,12 +141,13 @@ def health() -> dict[str, Any]:
         "client_ready": _session.client is not None and not _session.client.is_closed,
     }
 
-@app.get("/ready")
+@mcp.tool()
 def ready() -> dict[str, Any]:
+    """Check if the server is ready to handle requests."""
     return health()
 
+
 # Mount MCP at root - it will handle all other requests
-app.mount("/", mcp.streamable_http_app())
 
 # ─────────────────────────── Health Server ────────────────────────────────────
 
@@ -196,4 +191,4 @@ def run_health_server() -> None:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+    uvicorn.run(mcp, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
