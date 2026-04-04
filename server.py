@@ -32,13 +32,7 @@ USER_AGENT = (
     "Chrome/120.0.0.0 Safari/537.36"
 )
 
-settings = Settings(
-    host="0.0.0.0",
-    port=8080,
-    transport_security=TransportSecuritySettings(
-        enable_dns_rebinding_protection=False,
-    ),
-)
+
 
 
 class SASession:
@@ -144,6 +138,9 @@ def start_health_server():
 # ─────────────────────────── MCP Server ───────────────────────────────────────
 
 server = FastMCP("sa_forums_mcp", lifespan=app_lifespan,settings=settings)
+server.settings.transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=False,
+)
 
 @server.tool()
 def health() -> dict[str, Any]:
