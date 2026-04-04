@@ -148,4 +148,4 @@ def health() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(mcp, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+    uvicorn.run(mcp.asgi, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
