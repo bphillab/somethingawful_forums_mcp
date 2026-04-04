@@ -131,6 +131,33 @@ async def app_lifespan(server):
 
 mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
 
+app = FastAPI()
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "ready": True,
+        "logged_in": _session.logged_in,
+        "client_ready": _session.client is not None and not _session.client.is_closed,
+    }
+
+
+@app.get("/ready")
+def ready() -> dict[str, Any]:
+    return health()
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"status": "ok", "mcp": "/mcp", "health": "/health"}
+
+
+# Mount the MCP ASGI app under /mcp.
+# Different mcp versions name this differently; http_app() is the common one.
+app.mount("/mcp", mcp.http_app())
+
 # ─────────────────────────── Health Server ────────────────────────────────────
 
 
@@ -171,6 +198,6 @@ def run_health_server() -> None:
 # ─────────────────────────── Entry Point ──────────────────────────────────────
 
 if __name__ == "__main__":
-    # Start the MCP server in HTTP mode instead of stdio.
-    # Exact transport argument may vary by mcp version.
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=8080)
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
