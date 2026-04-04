@@ -1675,27 +1675,4 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
 
 
 if __name__ == "__main__":
-    import uvicorn
-    import contextlib
-    from starlette.applications import Starlette
-    from starlette.routing import Mount
-
-    # Start health check server in background
-    start_health_server()
-
-
-    # Create lifespan for Starlette that manages mcp.session_manager
-    @contextlib.asynccontextmanager
-    async def starlette_lifespan(app: Starlette):
-        async with mcp.session_manager.run():
-            yield
-
-
-    # Mount MCP at root
-    app = Starlette(
-        routes=[
-            Mount("/mcp", app=mcp.streamable_http_app()),
-        ],
-        lifespan=starlette_lifespan,
-    )    # Run on port 8080
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    mcp.run(transport="streamable-http")
