@@ -501,7 +501,7 @@ async def sa_list_forums(params: ListForumsInput) -> str:
         - "List all forums" → call with default params
     """
     try:
-        resp = await _session.get(f"{BASE_URL}/forumindex.php")
+        resp = await _session.get(f"{BASE_URL}")
         resp.raise_for_status()
     except Exception as e:
         return _handle_error(e)
