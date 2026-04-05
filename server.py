@@ -141,17 +141,6 @@ server = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
 server.settings.transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=False,
 )
-
-@server.tool()
-def health() -> dict[str, Any]:
-    """Check the health of the MCP server and session."""
-    return {
-        "status": "ok",
-        "ready": True,
-        "logged_in": _session.logged_in,
-        "client_ready": _session.client is not None and not _session.client.is_closed,
-    }
-
 # ─────────────────────────── Helpers ──────────────────────────────────────────
 
 
@@ -1684,18 +1673,6 @@ async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
             lines.append(f"> {t['context']}")
         lines.append("")
     return "\n".join(lines)
-############### Health Check ##################
-from starlette.routing import Route
-from starlette.responses import JSONResponse
-
-async def health(request):
-    return JSONResponse({"status": "ok", "logged_in": _session.logged_in})
-
-@server.custom_route("/health", methods=["GET"])
-async def health_check(request):
-    from starlette.responses import JSONResponse
-    return JSONResponse({"status": "ok", "logged_in": _session.logged_in})
-################################
 ########### main##############
 if __name__ == "__main__":
     import os
