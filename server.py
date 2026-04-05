@@ -3,21 +3,14 @@
 MCP Server for Something Awful Forums.
 """
 
-import asyncio
 import json
-import os
 import re
 from contextlib import asynccontextmanager
-from threading import Thread
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Optional, List, Dict
-from mcp.server.fastmcp.server import Settings
-from mcp.server.transport_security import TransportSecuritySettings
 
 import httpx
 from bs4 import BeautifulSoup
 from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.server import Settings
 from mcp.server.transport_security import TransportSecuritySettings
 
 from pydantic import BaseModel, ConfigDict, Field, Tag
