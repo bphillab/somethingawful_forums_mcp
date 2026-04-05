@@ -110,31 +110,6 @@ async def app_lifespan(server):
     await _session.ensure_client()
     yield {}
     await _session.close()
-
-
-# ─────────────────────────── Health Check Server ────────────────────────────
-
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        body = json.dumps({"status": "ok"}).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, format, *args):
-        return
-
-
-def start_health_server():
-    """Start health check server in background thread."""
-    server = HTTPServer(("0.0.0.0", 8080), HealthHandler)
-    thread = Thread(daemon=True, target=server.serve_forever)
-    thread.start()
-    print("Health check server started on port 8000")
-
-
 # ─────────────────────────── MCP Server ───────────────────────────────────────
 
 server = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
