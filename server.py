@@ -1,101 +1,40 @@
 #!/usr/bin/env python3
 """
 MCP Server for Something Awful Forums.
+
+This server provides tools to interact with the Something Awful Forums
+(forums.somethingawful.com), including reading threads and posts, browsing
+forums, searching, viewing user profiles, and managing private messages.
+
+Authentication uses your SA username and password, stored as environment
+variables SA_USERNAME and SA_PASSWORD.
 """
 
 import json
 import re
 from contextlib import asynccontextmanager
-from typing import Any, Optional, List, Dict
+from typing import Any, Dict, List, Optional
 
 import httpx
-from bs4 import BeautifulSoup
-from mcp.server.fastmcp import FastMCP
+from bs4 import BeautifulSoup, Tag
+from fastapi import FastAPI
+from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.transport_security import TransportSecuritySettings
+from pydantic import BaseModel, ConfigDict, Field
 
-from pydantic import BaseModel, ConfigDict, Field, Tag
+from session import SASession
+
+# ─────────────────────────── Constants ────────────────────────────────────────
 
 BASE_URL = "https://forums.somethingawful.com"
-LOGIN_URL = f"{BASE_URL}/account.php"
-DEFAULT_TIMEOUT = 30.0
 DEFAULT_PER_PAGE = 40
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/120.0.0.0 Safari/537.36"
-)
 
-
-
-
-class SASession:
-    """Manages the authenticated HTTP session for Something Awful Forums."""
-
-    def __init__(self) -> None:
-        self.client: Optional[httpx.AsyncClient] = None
-        self.logged_in: bool = False
-
-    async def ensure_client(self) -> httpx.AsyncClient:
-        if self.client is None or self.client.is_closed:
-            self.client = httpx.AsyncClient(
-                headers={"User-Agent": USER_AGENT},
-                follow_redirects=True,
-                timeout=DEFAULT_TIMEOUT,
-            )
-        return self.client
-
-    async def login(self) -> str:
-        """Log in with credentials from environment variables."""
-        username = os.environ.get("SA_USERNAME", "")
-        password = os.environ.get("SA_PASSWORD", "")
-
-        if not username or not password:
-            return (
-                "Error: SA_USERNAME and SA_PASSWORD environment variables must be set. "
-                "Add them to your MCP server configuration."
-            )
-
-        client = await self.ensure_client()
-        try:
-            response = await client.post(
-                LOGIN_URL,
-                data={
-                    "action": "login",
-                    "username": username,
-                    "password": password,
-                    "remember": "yes",
-                    "next": "/",
-                },
-            )
-            if "logout" in response.text.lower() or "logoutconfirm" in response.url.path:
-                self.logged_in = True
-                return "ok"
-            soup = BeautifulSoup(response.text, "html.parser")
-            error_el = soup.select_one(".error, .standard-error, #loginform .error")
-            if error_el:
-                return f"Error: Login failed — {error_el.get_text(strip=True)}"
-            if "account.php" not in str(response.url):
-                self.logged_in = True
-                return "ok"
-            return "Error: Login failed. Check your SA_USERNAME and SA_PASSWORD."
-        except httpx.HTTPStatusError as e:
-            return f"Error: HTTP {e.response.status_code} during login."
-        except Exception as e:
-            return f"Error: Login failed — {type(e).__name__}: {e}"
-
-    async def get(self, url: str, **kwargs) -> httpx.Response:
-        client = await self.ensure_client()
-        return await client.get(url, **kwargs)
-
-    async def post(self, url: str, **kwargs) -> httpx.Response:
-        client = await self.ensure_client()
-        return await client.post(url, **kwargs)
-
-    async def close(self) -> None:
-        if self.client and not self.client.is_closed:
-            await self.client.aclose()
+# ─────────────────────────── Session State ────────────────────────────────────
 
 _session = SASession()
+
+# ─────────────────────────── Lifespan ─────────────────────────────────────────
+
 
 @asynccontextmanager
 async def app_lifespan(server):
@@ -103,10 +42,12 @@ async def app_lifespan(server):
     await _session.ensure_client()
     yield {}
     await _session.close()
+
 # ─────────────────────────── MCP Server ───────────────────────────────────────
 
-server = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
-server.settings.transport_security = TransportSecuritySettings(
+mcp = FastMCP("sa_forums_mcp", lifespan=app_lifespan)
+
+mcp.settings.transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=False,
 )
 # ─────────────────────────── Helpers ──────────────────────────────────────────
@@ -401,7 +342,7 @@ class ListUserCPThreadsInput(BaseModel):
 # ─────────────────────────── Tools ────────────────────────────────────────────
 
 
-@server.tool(
+@mcp.tool(
     name="sa_login",
     annotations={
         "title": "Log in to Something Awful",
@@ -438,7 +379,7 @@ async def sa_login(params: LoginInput=LoginInput()) -> str:
     return result
 
 
-@server.tool(
+@mcp.tool(
     name="sa_list_forums",
     annotations={
         "title": "List SA Forums",
@@ -561,7 +502,7 @@ async def sa_list_forums(params: ListForumsInput) -> str:
     return "\n".join(lines)
 
 
-@server.tool(
+@mcp.tool(
     name="sa_list_threads",
     annotations={
         "title": "List Threads in a Forum",
@@ -747,7 +688,7 @@ async def sa_list_threads(params: ListThreadsInput) -> str:
     return "\n".join(lines)
 
 
-@server.tool(
+@mcp.tool(
     name="sa_get_thread",
     annotations={
         "title": "Read Thread Posts",
@@ -892,7 +833,7 @@ async def sa_get_thread(params: GetThreadInput) -> str:
     return "\n".join(lines)
 
 
-@server.tool(
+@mcp.tool(
     name="sa_search",
     annotations={
         "title": "Search SA Forums",
@@ -1070,7 +1011,7 @@ async def sa_search(params: SearchInput) -> str:
     return "\n".join(lines)
 
 
-@server.tool(
+@mcp.tool(
     name="sa_get_user",
     annotations={
         "title": "Get SA User Profile",
@@ -1213,7 +1154,7 @@ async def sa_get_user(params: GetUserInput) -> str:
     return "\n".join(lines)
 
 
-@server.tool(
+@mcp.tool(
     name="sa_list_pms",
     annotations={
         "title": "List SA Private Messages",
@@ -1361,7 +1302,7 @@ async def sa_list_pms(params: ListPMsInput) -> str:
     return "\n".join(lines)
 
 
-@server.tool(
+@mcp.tool(
     name="sa_get_pm",
     annotations={
         "title": "Read a SA Private Message",
@@ -1475,7 +1416,7 @@ async def sa_get_pm(params: GetPMInput) -> str:
     lines.append("\n---\n")
     lines.append(body or "*(empty message)*")
     return "\n".join(lines)
-@server.tool(
+@mcp.tool(
     name="sa_list_usercp_threads",
     annotations={
         "title": "List Threads on User Control Panel",
@@ -1647,7 +1588,7 @@ if __name__ == "__main__":
     import uvicorn
     from starlette.responses import JSONResponse
 
-    @server.custom_route("/health", methods=["GET"])
+    @mcp.custom_route("/health", methods=["GET"])
     async def health(request):
         return JSONResponse({
             "status": "ok",
@@ -1656,5 +1597,5 @@ if __name__ == "__main__":
         })
 
     port = int(os.environ.get("PORT", 8080))
-    app = server.streamable_http_app()
+    app = mcp.streamable_http_app()
     uvicorn.run(app, host="0.0.0.0", port=port)
