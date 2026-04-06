@@ -66,15 +66,20 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         if not qid_match:
             page_text = resp.text.lower()
             if "search the forums" in page_text and "example searches" in page_text:
+                if "log in" in page_text or "login" in page_text or "register" in page_text:
+                    return (
+                        f"Error: SA returned the search form instead of results for '{params.query}'. "
+                        "This usually means you are not logged in — try calling sa_login first."
+                    )
                 return (
                     f"Error: SA returned the search form instead of results for '{params.query}'. "
-                    "Try a simpler query or constrain it to a forum."
+                    "Try a simpler query or constrain it to a forum. If the problem persists, try sa_login."
                 )
             if "no results" in page_text or "0 results" in page_text:
                 return f"No results found for '{params.query}'. Try different search terms."
             return (
                 "Error: Could not initiate search — SA may have rejected the query, "
-                "returned the form again, or be rate limiting."
+                "returned the form again, or be rate limiting. If you haven't logged in, try sa_login first."
             )
 
         qid = qid_match.group(1)
