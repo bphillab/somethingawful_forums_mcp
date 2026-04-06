@@ -71,11 +71,21 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             desc_el = row.select_one("span.forumdesc")
             fdesc = _text(desc_el).lstrip(" -").strip() if desc_el else ""
 
+            subforums: List[Dict[str, Any]] = []
+            subforum_el = row.select_one("div.subforums")
+            if subforum_el:
+                for sf_link in subforum_el.select("a"):
+                    sf_href = _attr(sf_link, "href")
+                    sf_match = re.search(r"forumid=(\d+)", sf_href)
+                    if sf_match:
+                        subforums.append({"id": int(sf_match.group(1)), "name": _text(sf_link)})
+
             current_forums.append(
                 {
                     "id": fid,
                     "name": fname,
                     "description": fdesc,
+                    "subforums": subforums,
                     "threads": "",
                     "posts": "",
                 }
@@ -104,5 +114,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                 if f["posts"]:
                     counts += f" | {f['posts']} posts"
                 lines.append(f"- **{f['name']}** (ID: {f['id']}){desc}{counts}")
+                for sf in f.get("subforums", []):
+                    lines.append(f"  - {sf['name']} (ID: {sf['id']})")
             lines.append("")
         return "\n".join(lines)
