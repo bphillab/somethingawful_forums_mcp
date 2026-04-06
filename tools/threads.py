@@ -207,6 +207,8 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             final_url = str(resp.url)
             page_match = re.search(r"pagenumber=(\d+)", final_url)
             effective_page = int(page_match.group(1)) if page_match else 1
+            tid_match = re.search(r"threadid=(\d+)", final_url)
+            effective_thread_id = int(tid_match.group(1)) if tid_match else params.thread_id
         elif params.last_page:
             effective_page = total_pages
         else:
@@ -260,16 +262,19 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                     }
                 )
 
+        if not params.goto_post_id:
+            effective_thread_id = params.thread_id
+
         if not posts:
             return (
-                f"No posts found in thread {params.thread_id} page {effective_page}. "
+                f"No posts found in thread {effective_thread_id} page {effective_page}. "
                 "Make sure you're logged in (sa_login) and the thread ID is correct."
             )
 
         if params.response_format == "json":
             return json.dumps(
                 {
-                    "thread_id": params.thread_id,
+                    "thread_id": effective_thread_id,
                     "thread_title": thread_title,
                     "page": effective_page,
                     "total_pages": total_pages,
@@ -278,7 +283,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                 indent=2,
             )
 
-        lines = [f"# {thread_title} (page {effective_page} of {total_pages})\n"]
+        lines = [f"# {thread_title} (Thread ID: {effective_thread_id} | page {effective_page} of {total_pages})\n"]
         for p in posts:
             lines.append("---")
             pid_str = f" | Post #{p['id']}" if p["id"] else ""
