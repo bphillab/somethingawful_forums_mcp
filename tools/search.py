@@ -27,7 +27,11 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         },
     )
     async def sa_search(params: SearchInput) -> str:
-        """Search the Something Awful Forums for threads and posts."""
+        """Search the Something Awful Forums for threads and posts.
+
+        Requires an active login session. If search returns errors or unexpected results,
+        call sa_login first before retrying. Do not assume rate limiting until login has
+        been confirmed."""
         q = params.query
         if params.title:
             q = f'{q} intitle:"{params.title}"'
