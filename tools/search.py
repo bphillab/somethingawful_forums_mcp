@@ -28,8 +28,18 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
     async def sa_search(params: SearchInput) -> str:
         """Search the Something Awful Forums for threads and posts."""
         q = params.query
+        if params.title:
+            q = f'{q} intitle:"{params.title}"'
         if params.user:
             q = f'{q} username:"{params.user}"'
+        if params.quoting:
+            q = f'{q} quoting:"{params.quoting}"'
+        if params.since:
+            q = f"{q} since:{params.since}"
+        if params.before:
+            q = f"{q} before:{params.before}"
+        if params.threadid:
+            q = f"{q} threadid:{params.threadid}"
 
         post_data: Dict[str, Any] = {
             "action": "query",

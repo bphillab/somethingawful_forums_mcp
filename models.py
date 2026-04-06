@@ -85,6 +85,31 @@ class SearchInput(BaseModel):
         ),
         max_length=100,
     )
+    title: Optional[str] = Field(
+        default=None,
+        description="Search within thread titles only. Appended as intitle:\"...\".",
+        max_length=300,
+    )
+    since: Optional[str] = Field(
+        default=None,
+        description="Restrict results to posts on or after this date (YYYY-MM-DD). Appended as since:YYYY-MM-DD.",
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+    )
+    before: Optional[str] = Field(
+        default=None,
+        description="Restrict results to posts before this date (YYYY-MM-DD). Appended as before:YYYY-MM-DD.",
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+    )
+    quoting: Optional[str] = Field(
+        default=None,
+        description="Restrict results to posts quoting this SA username. Appended as quoting:\"...\".",
+        max_length=100,
+    )
+    threadid: Optional[int] = Field(
+        default=None,
+        description="Restrict results to a specific thread ID. Appended as threadid:X.",
+        ge=1,
+    )
     page: int = Field(default=1, description="Page of results to fetch", ge=1)
     response_format: str = Field(
         default="markdown",
