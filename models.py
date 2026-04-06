@@ -115,6 +115,10 @@ class SearchInput(BaseModel):
         description="Restrict results to a specific thread ID. Appended as threadid:X.",
         ge=1,
     )
+    resolve_thread_ids: bool = Field(
+        default=False,
+        description="If true, follow post redirects to resolve missing thread IDs. Makes one extra request per result with a missing thread ID — use sparingly.",
+    )
     page: int = Field(default=1, description="Page of results to fetch", ge=1)
     response_format: str = Field(
         default="markdown",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import re
@@ -107,15 +108,24 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                     total_pages = math.ceil(result_count / per_page)
             break
 
-        results: List[Dict[str, Any]] = []
+        async def resolve_thread_id(pid: int) -> int:
+            try:
+                r = await session.get(
+                    f"{BASE_URL}/showthread.php?goto=post&postid={pid}"
+                )
+                tid_m = re.search(r"threadid=(\d+)", str(r.url))
+                return int(tid_m.group(1)) if tid_m else 0
+            except Exception:
+                return 0
 
         thread_links = soup.select("a[href*='showthread.php']")
+        raw: List[Dict[str, Any]] = []
         for thread_link in thread_links:
             href = _attr(thread_link, "href")
             pid_match = re.search(r"postid=(\d+)", href)
             tid_match = re.search(r"threadid=(\d+)", href)
-            pid = int(pid_match.group(1)) if pid_match else 0
-            tid = int(tid_match.group(1)) if tid_match else 0
+            post_id = int(pid_match.group(1)) if pid_match else 0
+            thread_id = int(tid_match.group(1)) if tid_match else 0
             thread_title = _text(thread_link)
 
             parent = thread_link.parent
@@ -144,17 +154,29 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                 after_date = parent_text[date_match.end():].strip()
                 excerpt = after_date[:300]
 
-            results.append(
+            raw.append(
                 {
-                    "thread_id": tid,
+                    "thread_id": thread_id,
                     "thread_title": thread_title,
-                    "post_id": pid,
+                    "post_id": post_id,
                     "forum": forum_name,
                     "author": author,
                     "date": date,
                     "excerpt": excerpt,
                 }
             )
+
+        # Resolve missing thread IDs concurrently via post redirect (opt-in)
+        if params.resolve_thread_ids:
+            missing = [r for r in raw if r["thread_id"] == 0 and r["post_id"]]
+            if missing:
+                resolved = await asyncio.gather(
+                    *[resolve_thread_id(r["post_id"]) for r in missing]
+                )
+                for entry, tid in zip(missing, resolved):
+                    entry["thread_id"] = tid
+
+        results = raw
 
         if not results:
             return f"No results found for '{params.query}'. Try different search terms or check your login status."
