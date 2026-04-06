@@ -92,18 +92,23 @@ class SearchInput(BaseModel):
     )
     since: Optional[str] = Field(
         default=None,
-        description="Restrict results to posts on or after this date (YYYY-MM-DD). Appended as since:YYYY-MM-DD.",
-        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="Restrict results to posts on or after this date. Accepts YYYY-MM-DD or relative strings like \"last monday\" or \"2 days ago\". Appended as since:\"...\".",
+        max_length=100,
     )
     before: Optional[str] = Field(
         default=None,
-        description="Restrict results to posts before this date (YYYY-MM-DD). Appended as before:YYYY-MM-DD.",
-        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="Restrict results to posts before this date. Accepts YYYY-MM-DD or relative strings like \"last monday\" or \"2 days ago\". Appended as before:\"...\".",
+        max_length=100,
     )
     quoting: Optional[str] = Field(
         default=None,
         description="Restrict results to posts quoting this SA username. Appended as quoting:\"...\".",
         max_length=100,
+    )
+    userid: Optional[int] = Field(
+        default=None,
+        description="Restrict search to posts by this SA user ID. Appended as userid:X.",
+        ge=1,
     )
     threadid: Optional[int] = Field(
         default=None,
