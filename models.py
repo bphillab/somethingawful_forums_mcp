@@ -34,9 +34,9 @@ class ListThreadsInput(BaseModel):
 
 class GetThreadInput(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    thread_id: int = Field(
-        ...,
-        description="The SA thread ID. Found in thread URLs as threadid=X.",
+    thread_id: Optional[int] = Field(
+        default=None,
+        description="The SA thread ID. Found in thread URLs as threadid=X. Required unless goto_post_id is set.",
         ge=1,
     )
     page: int = Field(default=1, description="Page of posts to fetch", ge=1)
@@ -47,6 +47,11 @@ class GetThreadInput(BaseModel):
     goto_newpost: bool = Field(
         default=False,
         description="If true, follow the thread's goto=newpost link and fetch the page containing the first unread post.",
+    )
+    goto_post_id: Optional[int] = Field(
+        default=None,
+        description="If set, jump directly to this post ID (uses goto=post&postid=X). Fetches the page containing that post. thread_id is not required when this is set.",
+        ge=1,
     )
     response_format: str = Field(
         default="markdown",

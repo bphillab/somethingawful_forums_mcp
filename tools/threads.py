@@ -167,7 +167,14 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
     )
     async def sa_get_thread(params: GetThreadInput) -> str:
         """Read posts from a Something Awful thread."""
-        if params.goto_newpost:
+        if params.goto_post_id:
+            url = (
+                f"{BASE_URL}/showthread.php"
+                f"?goto=post&noseen=1&postid={params.goto_post_id}"
+            )
+        elif not params.thread_id:
+            return "thread_id is required when goto_post_id is not set."
+        elif params.goto_newpost:
             url = (
                 f"{BASE_URL}/showthread.php"
                 f"?threadid={params.thread_id}&goto=newpost"
