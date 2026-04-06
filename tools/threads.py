@@ -202,7 +202,15 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         thread_title = _text(title_el).replace(" - Something Awful Forums", "").strip()
 
         total_pages = _extract_page_count(soup)
-        effective_page = total_pages if params.last_page else params.page
+
+        if params.goto_post_id:
+            final_url = str(resp.url)
+            page_match = re.search(r"pagenumber=(\d+)", final_url)
+            effective_page = int(page_match.group(1)) if page_match else 1
+        elif params.last_page:
+            effective_page = total_pages
+        else:
+            effective_page = params.page
 
         posts: List[Dict[str, Any]] = []
 
