@@ -35,9 +35,11 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         if params.quoting:
             q = f'{q} quoting:"{params.quoting}"'
         if params.since:
-            q = f"{q} since:{params.since}"
+            q = f'{q} since:"{params.since}"'
         if params.before:
-            q = f"{q} before:{params.before}"
+            q = f'{q} before:"{params.before}"'
+        if params.userid:
+            q = f"{q} userid:{params.userid}"
         if params.threadid:
             q = f"{q} threadid:{params.threadid}"
 
