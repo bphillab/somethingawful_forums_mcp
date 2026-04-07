@@ -34,6 +34,15 @@ def _require_login_msg() -> str:
     )
 
 
+def _page_from_redirect(url: str, fallback_soup: BeautifulSoup) -> int:
+    """Extract the current page number from a redirect URL, falling back to HTML pagination."""
+    m = re.search(r"pagenumber=(\d+)", url)
+    if m:
+        return int(m.group(1))
+    current = _extract_current_page(fallback_soup)
+    return current if current else 0
+
+
 def _parse_posts(soup: BeautifulSoup) -> List[Dict[str, Any]]:
     """Parse all posts from a SA thread page."""
     post_tables = soup.select("table.post, div.post, .postbody, tr.post")

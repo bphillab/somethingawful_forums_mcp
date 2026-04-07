@@ -8,10 +8,10 @@ from mcp.server.fastmcp import FastMCP
 
 from helpers import (
     _attr,
-    _extract_current_page,
     _extract_page_count,
     _extract_thread_title_from_row,
     _handle_error,
+    _page_from_redirect,
     _parse_posts,
     _soup,
     _text,
@@ -203,13 +203,6 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         thread_title = _text(title_el).replace(" - Something Awful Forums", "").strip()
 
         total_pages = _extract_page_count(soup)
-
-        def _page_from_redirect(url: str, fallback_soup) -> int:
-            m = re.search(r"pagenumber=(\d+)", url)
-            if m:
-                return int(m.group(1))
-            current = _extract_current_page(fallback_soup)
-            return current if current else 0
 
         if params.goto_post_id:
             final_url = str(resp.url)
