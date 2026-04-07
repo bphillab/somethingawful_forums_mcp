@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from mcp.server.fastmcp import FastMCP
 
 from helpers import (
     _attr,
-    _clean_thread_title,
     _extract_current_page,
     _extract_page_count,
     _extract_thread_title_from_row,
     _handle_error,
+    _parse_posts,
     _soup,
     _text,
 )
@@ -224,59 +224,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         else:
             effective_page = params.page
 
-        posts: List[Dict[str, Any]] = []
-
-        post_tables = soup.select("table.post, div.post, .postbody, tr.post")
-        if not post_tables:
-            post_tables = soup.select("[id^='post']")
-
-        for post_el in post_tables:
-            post_id_str = post_el.get("id", "") or ""
-            pid_match = re.search(r"(\d+)", post_id_str)
-            pid = int(pid_match.group(1)) if pid_match else 0
-
-            author_el = post_el.select_one(
-                ".author, .username, td.userinfo .author, .postername, a.author"
-            )
-            author = _text(author_el)
-
-            author_link = post_el.select_one("a[href*='userid='], a[href*='member.php']")
-            aid_match = re.search(r"userid=(\d+)", _attr(author_link, "href"))
-            author_id = int(aid_match.group(1)) if aid_match else 0
-
-            date_el = post_el.select_one(".postdate, .date, td.postdate")
-            post_date = _text(date_el)
-
-            content_el = post_el.select_one(".postbody, .post-body, td.postbody")
-            if content_el:
-                for quote in content_el.select(".bbc-block, blockquote, .quote"):
-                    quote_author_el = quote.select_one(".author, cite")
-                    qa = _text(quote_author_el) if quote_author_el else "someone"
-                    quote.replace_with(f"[quote from {qa}]")
-                for img in content_el.select("img"):
-                    label = img.get("title") or img.get("alt") or ""
-                    if label:
-                        img.replace_with(f" {label} ")
-                    else:
-                        img.decompose()
-                content = content_el.get_text(" ", strip=True)
-            else:
-                content = ""
-
-            avatar_el = post_el.select_one("img.avatar, .useravatar img, td.userinfo img")
-            avatar_url = _attr(avatar_el, "src") if avatar_el else ""
-
-            if author or content:
-                posts.append(
-                    {
-                        "id": pid,
-                        "author": author,
-                        "author_id": author_id,
-                        "date": post_date,
-                        "content": content,
-                        "avatar_url": avatar_url,
-                    }
-                )
+        posts = _parse_posts(soup)
 
         if not params.goto_post_id:
             effective_thread_id = params.thread_id
