@@ -9,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from helpers import (
     _attr,
     _clean_thread_title,
+    _extract_current_page,
     _extract_page_count,
     _extract_thread_title_from_row,
     _handle_error,
@@ -203,12 +204,21 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
 
         total_pages = _extract_page_count(soup)
 
+        def _page_from_redirect(url: str, fallback_soup) -> int:
+            m = re.search(r"pagenumber=(\d+)", url)
+            if m:
+                return int(m.group(1))
+            current = _extract_current_page(fallback_soup)
+            return current if current else 0
+
         if params.goto_post_id:
             final_url = str(resp.url)
-            page_match = re.search(r"pagenumber=(\d+)", final_url)
-            effective_page = int(page_match.group(1)) if page_match else 1
+            effective_page = _page_from_redirect(final_url, soup) or "?"
             tid_match = re.search(r"threadid=(\d+)", final_url)
             effective_thread_id = int(tid_match.group(1)) if tid_match else params.thread_id
+        elif params.goto_newpost:
+            final_url = str(resp.url)
+            effective_page = _page_from_redirect(final_url, soup) or "?"
         elif params.last_page:
             effective_page = total_pages
         else:

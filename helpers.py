@@ -34,6 +34,18 @@ def _require_login_msg() -> str:
     )
 
 
+def _extract_current_page(soup: BeautifulSoup) -> int:
+    """Extract the current page number from SA pagination."""
+    pages_el = soup.select_one(".pages, .pagenav")
+    if pages_el:
+        # SA marks the current page as a <span> or bold text without a link
+        for el in pages_el.select("span, b"):
+            text = el.get_text(strip=True)
+            if text.isdigit():
+                return int(text)
+    return 0
+
+
 def _extract_page_count(soup: BeautifulSoup) -> int:
     """Extract total page count from SA pagination."""
     pages_el = soup.select_one(".pages, .pagenav")
