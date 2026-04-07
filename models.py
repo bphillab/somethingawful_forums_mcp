@@ -53,6 +53,11 @@ class GetThreadInput(BaseModel):
         description="If set, jump directly to this post ID (uses goto=post&postid=X). Fetches the page containing that post. thread_id is not required when this is set.",
         ge=1,
     )
+    since_post_id: Optional[int] = Field(
+        default=None,
+        description="If set, only return posts with an ID greater than this value. Useful combined with goto_post_id to get only posts after a known post.",
+        ge=1,
+    )
     response_format: str = Field(
         default="markdown",
         description="Output format: 'markdown' (default) or 'json'",

@@ -10,36 +10,10 @@ Authentication uses your SA username and password, stored as environment
 variables SA_USERNAME and SA_PASSWORD.
 """
 
-import json
-import re
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
 
-from bs4 import BeautifulSoup, Tag
-from fastapi import FastAPI
-from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from pydantic import BaseModel, ConfigDict, Field
-
-from helpers import (
-    _attr,
-    _clean_thread_title,
-    _extract_last_page_url_from_row,
-    _extract_page_count,
-    _extract_thread_title_from_row,
-    _extract_unread_count_from_row,
-    _extract_unread_link_from_row,
-    _handle_error,
-    _require_login_msg,
-    _soup,
-    _text,
-)
-
-from models import (
-    GetPMInput,
-    GetThreadInput,
-    GetUserInput, LoginInput, ListForumsInput, ListThreadsInput, SearchInput, ListPMsInput, ListUserCPThreadsInput,
-)
 
 from tools.auth import register_tools as register_auth_tools
 from tools.forums import register_tools as register_forums_tools
@@ -102,7 +76,6 @@ if __name__ == "__main__":
             "logged_in": _session.logged_in,
             "client_ready": _session.client is not None and not _session.client.is_closed,
         })
-
     port = int(os.environ.get("PORT", 8080))
     app = mcp.streamable_http_app()
     uvicorn.run(app, host="0.0.0.0", port=port)

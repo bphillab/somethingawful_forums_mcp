@@ -265,6 +265,17 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         if not params.goto_post_id:
             effective_thread_id = params.thread_id
 
+        first_unread_post_id = 0
+        if params.goto_newpost:
+            first_unseen = soup.select_one("table.post.seen0, tr.post.seen0")
+            if first_unseen:
+                unseen_id_match = re.search(r"(\d+)", first_unseen.get("id", "") or "")
+                if unseen_id_match:
+                    first_unread_post_id = int(unseen_id_match.group(1))
+
+        if params.since_post_id:
+            posts = [p for p in posts if p["id"] > params.since_post_id]
+
         if not posts:
             return (
                 f"No posts found in thread {effective_thread_id} page {effective_page}. "
@@ -272,18 +283,21 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             )
 
         if params.response_format == "json":
-            return json.dumps(
-                {
-                    "thread_id": effective_thread_id,
-                    "thread_title": thread_title,
-                    "page": effective_page,
-                    "total_pages": total_pages,
-                    "posts": posts,
-                },
-                indent=2,
-            )
+            result: Dict[str, Any] = {
+                "thread_id": effective_thread_id,
+                "thread_title": thread_title,
+                "page": effective_page,
+                "total_pages": total_pages,
+                "posts": posts,
+            }
+            if first_unread_post_id:
+                result["first_unread_post_id"] = first_unread_post_id
+            return json.dumps(result, indent=2)
 
-        lines = [f"# {thread_title} (Thread ID: {effective_thread_id} | page {effective_page} of {total_pages})\n"]
+        header = f"# {thread_title} (Thread ID: {effective_thread_id} | page {effective_page} of {total_pages})"
+        if first_unread_post_id:
+            header += f" | First unread post: #{first_unread_post_id}"
+        lines = [header + "\n"]
         for p in posts:
             lines.append("---")
             pid_str = f" | Post #{p['id']}" if p["id"] else ""
