@@ -9,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from helpers import (
     _attr,
     _clean_thread_title,
+    _extract_id,
     _extract_thread_title_from_row,
     _extract_unread_count_from_row,
     _extract_unread_link_from_row,
@@ -16,6 +17,7 @@ from helpers import (
     _require_login_msg,
     _soup,
     _text,
+    _tool_annotations,
 )
 from constants import BASE_URL
 from models import ListUserCPThreadsInput
@@ -25,13 +27,7 @@ from session import SASession
 def register_tools(mcp: FastMCP, session: SASession) -> None:
     @mcp.tool(
         name="sa_list_usercp_threads",
-        annotations={
-            "title": "List Threads on User Control Panel",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True,
-        },
+        annotations=_tool_annotations("List Threads on User Control Panel"),
     )
     async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
         """List thread links shown on the SA user control panel page."""
@@ -52,10 +48,9 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
 
         for link in soup.select("a[href*='showthread.php']"):
             href = _attr(link, "href")
-            tid_match = re.search(r"threadid=(\d+)", href)
-            if not tid_match:
+            thread_id = _extract_id(href, "threadid")
+            if not thread_id:
                 continue
-            thread_id = int(tid_match.group(1))
             if thread_id in seen:
                 continue
             seen.add(thread_id)
@@ -102,10 +97,8 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                 page_links = row.select("a[href*='pagenumber=']")
                 for a in page_links:
                     page_href = _attr(a, "href")
-                    page_match = re.search(r"pagenumber=(\d+)", page_href)
-                    if page_match:
-                        page_num = int(page_match.group(1))
-                        if page_num > last_page_num:
+                    page_num = _extract_id(page_href, "pagenumber")
+                    if page_num > last_page_num:
                             last_page_num = page_num
                             last_page_url = f"{BASE_URL}/{page_href.lstrip('/')}"
 
@@ -118,13 +111,8 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                     unread_resp.raise_for_status()
                     final_url = str(unread_resp.url)
 
-                    page_match = re.search(r"pagenumber=(\d+)", final_url)
-                    if page_match:
-                        unread_page = int(page_match.group(1))
-
-                    post_match = re.search(r"postid=(\d+)", final_url)
-                    if post_match:
-                        first_unread_post_id = int(post_match.group(1))
+                    unread_page = _extract_id(final_url, "pagenumber")
+                    first_unread_post_id = _extract_id(final_url, "postid")
                 except Exception:
                     pass
 

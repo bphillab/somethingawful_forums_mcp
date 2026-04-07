@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Dict, List
 
 from mcp.server.fastmcp import FastMCP
 
 from constants import BASE_URL
-from helpers import _attr, _handle_error, _soup, _text
+from helpers import _attr, _extract_id, _handle_error, _soup, _text, _tool_annotations
 from models import ListForumsInput
 from session import SASession
 
@@ -15,13 +14,7 @@ from session import SASession
 def register_tools(mcp: FastMCP, session: SASession) -> None:
     @mcp.tool(
         name="sa_list_forums",
-        annotations={
-            "title": "List SA Forums",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True,
-        },
+        annotations=_tool_annotations("List SA Forums"),
     )
     async def sa_list_forums(params: ListForumsInput) -> str:
         """List all available forums on Something Awful.
@@ -60,11 +53,9 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                 continue
 
             href = _attr(forum_link, "href")
-            fid_match = re.search(r"forumid=(\d+)", href)
-            if not fid_match:
+            fid = _extract_id(href, "forumid")
+            if not fid:
                 continue
-
-            fid = int(fid_match.group(1))
             fname = _text(forum_link)
 
             desc_el = row.select_one("span.forumdesc")
@@ -74,10 +65,9 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             subforum_el = row.select_one("div.subforums")
             if subforum_el:
                 for sf_link in subforum_el.select("a"):
-                    sf_href = _attr(sf_link, "href")
-                    sf_match = re.search(r"forumid=(\d+)", sf_href)
-                    if sf_match:
-                        subforums.append({"id": int(sf_match.group(1)), "name": _text(sf_link)})
+                    sf_id = _extract_id(_attr(sf_link, "href"), "forumid")
+                    if sf_id:
+                        subforums.append({"id": sf_id, "name": _text(sf_link)})
 
             current_forums.append(
                 {

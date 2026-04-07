@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Dict
 
 from mcp.server.fastmcp import FastMCP
 
 from constants import BASE_URL
-from helpers import _attr, _handle_error, _require_login_msg, _soup, _text
+from helpers import _attr, _extract_id, _handle_error, _require_login_msg, _soup, _text, _tool_annotations
 from models import GetUserInput
 from session import SASession
 
@@ -15,13 +14,7 @@ from session import SASession
 def register_tools(mcp: FastMCP, session: SASession) -> None:
     @mcp.tool(
         name="sa_get_user",
-        annotations={
-            "title": "Get SA User Profile",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True,
-        },
+        annotations=_tool_annotations("Get SA User Profile"),
     )
     async def sa_get_user(params: GetUserInput) -> str:
         """Look up a Something Awful user's profile."""
@@ -46,10 +39,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
 
         soup = _soup(resp.text)
 
-        uid = params.user_id or 0
-        uid_match = re.search(r"userid=(\d+)", resp.text)
-        if uid_match:
-            uid = int(uid_match.group(1))
+        uid = _extract_id(resp.text, "userid") or params.user_id or 0
 
         username_el = soup.select_one("h1, .username, .profile-username, title")
         username = _text(username_el).replace(" - Something Awful Forums", "").strip()

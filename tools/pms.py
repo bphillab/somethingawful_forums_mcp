@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Dict, List
 
 from mcp.server.fastmcp import FastMCP
 
 from constants import BASE_URL
-from helpers import _attr, _extract_page_count, _handle_error, _require_login_msg, _soup, _text
+from helpers import _attr, _extract_id, _extract_page_count, _handle_error, _require_login_msg, _soup, _text, _tool_annotations
 from models import GetPMInput, ListPMsInput
 from session import SASession
 
@@ -15,13 +14,7 @@ from session import SASession
 def register_tools(mcp: FastMCP, session: SASession) -> None:
     @mcp.tool(
         name="sa_list_pms",
-        annotations={
-            "title": "List SA Private Messages",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True,
-        },
+        annotations=_tool_annotations("List SA Private Messages"),
     )
     async def sa_list_pms(params: ListPMsInput) -> str:
         """List private messages in a Something Awful inbox folder."""
@@ -56,8 +49,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             if not link:
                 continue
             href = _attr(link, "href")
-            pm_match = re.search(r"privatemessageid=(\d+)", href)
-            pm_id = int(pm_match.group(1)) if pm_match else 0
+            pm_id = _extract_id(href, "privatemessageid")
 
             subject = _text(link)
             sender_el = row.select_one(".sender, .from, td.sender, a[href*='userid']")
@@ -111,13 +103,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
 
     @mcp.tool(
         name="sa_get_pm",
-        annotations={
-            "title": "Read a SA Private Message",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True,
-        },
+        annotations=_tool_annotations("Read a SA Private Message"),
     )
     async def sa_get_pm(params: GetPMInput) -> str:
         """Read the full content of a Something Awful private message."""

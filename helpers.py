@@ -7,6 +7,23 @@ import httpx
 from constants import BASE_URL
 
 
+def _extract_id(text: str, param: str) -> int:
+    """Extract an integer ID from a URL query string. Returns 0 if not found."""
+    m = re.search(rf"{param}=(\d+)", text)
+    return int(m.group(1)) if m else 0
+
+
+def _tool_annotations(title: str, read_only: bool = True) -> Dict[str, Any]:
+    """Return standard MCP tool annotations."""
+    return {
+        "title": title,
+        "readOnlyHint": read_only,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True,
+    }
+
+
 def _handle_error(e: Exception) -> str:
     """Return a clear, actionable error message."""
     if isinstance(e, httpx.HTTPStatusError):

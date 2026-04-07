@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 
 from helpers import (
     _attr,
+    _extract_id,
     _extract_page_count,
     _extract_thread_title_from_row,
     _handle_error,
@@ -15,6 +16,7 @@ from helpers import (
     _parse_posts,
     _soup,
     _text,
+    _tool_annotations,
 )
 from constants import BASE_URL, DEFAULT_PER_PAGE
 from models import GetThreadInput, ListThreadsInput
@@ -24,13 +26,7 @@ from session import SASession
 def register_tools(mcp: FastMCP, session: SASession) -> None:
     @mcp.tool(
         name="sa_list_threads",
-        annotations={
-            "title": "List Threads in a Forum",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True,
-        },
+        annotations=_tool_annotations("List Threads in a Forum"),
     )
     async def sa_list_threads(params: ListThreadsInput) -> str:
         """List threads in a specific Something Awful forum."""
@@ -65,11 +61,9 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             if not link:
                 continue
             href = _attr(link, "href")
-            tid_match = re.search(r"threadid=(\d+)", href)
-            if not tid_match:
+            tid = _extract_id(href, "threadid")
+            if not tid:
                 continue
-
-            tid = int(tid_match.group(1))
             title = _extract_thread_title_from_row(row)
 
             author_el = row.select_one(".author, td.author, .threadauthor")
@@ -156,13 +150,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
 
     @mcp.tool(
         name="sa_get_thread",
-        annotations={
-            "title": "Read Thread Posts",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True,
-        },
+        annotations=_tool_annotations("Read Thread Posts"),
     )
     async def sa_get_thread(params: GetThreadInput) -> str:
         """Read posts from a Something Awful thread."""
@@ -205,8 +193,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         if params.goto_post_id:
             final_url = str(resp.url)
             effective_page = _page_from_redirect(final_url, soup) or "?"
-            tid_match = re.search(r"threadid=(\d+)", final_url)
-            effective_thread_id = int(tid_match.group(1)) if tid_match else params.thread_id
+            effective_thread_id = _extract_id(final_url, "threadid") or params.thread_id
         elif params.goto_newpost:
             final_url = str(resp.url)
             effective_page = _page_from_redirect(final_url, soup) or "?"

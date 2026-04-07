@@ -3,13 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import math
-import re
 from typing import Any, Dict, List
 
 from mcp.server.fastmcp import FastMCP
 
 from constants import BASE_URL
-from helpers import _attr, _extract_page_count, _handle_error, _soup, _text
+from helpers import _attr, _extract_id, _extract_page_count, _handle_error, _soup, _text, _tool_annotations
 from models import SearchInput
 from session import SASession
 
@@ -17,13 +16,7 @@ from session import SASession
 def register_tools(mcp: FastMCP, session: SASession) -> None:
     @mcp.tool(
         name="sa_search",
-        annotations={
-            "title": "Search SA Forums",
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-            "openWorldHint": True,
-        },
+        annotations=_tool_annotations("Search SA Forums"),
     )
     async def sa_search(params: SearchInput) -> str:
         """Search the Something Awful Forums for threads and posts.
@@ -116,8 +109,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                 r = await session.get(
                     f"{BASE_URL}/showthread.php?goto=post&postid={pid}"
                 )
-                tid_m = re.search(r"threadid=(\d+)", str(r.url))
-                return int(tid_m.group(1)) if tid_m else 0
+                return _extract_id(str(r.url), "threadid")
             except Exception:
                 return 0
 
@@ -125,10 +117,8 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         raw: List[Dict[str, Any]] = []
         for thread_link in thread_links:
             href = _attr(thread_link, "href")
-            pid_match = re.search(r"postid=(\d+)", href)
-            tid_match = re.search(r"threadid=(\d+)", href)
-            post_id = int(pid_match.group(1)) if pid_match else 0
-            thread_id = int(tid_match.group(1)) if tid_match else 0
+            post_id = _extract_id(href, "postid")
+            thread_id = _extract_id(href, "threadid")
             thread_title = _text(thread_link)
 
             parent = thread_link.parent
