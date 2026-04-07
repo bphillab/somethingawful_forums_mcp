@@ -71,6 +71,9 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             last_page_url = ""
             last_page_num = 0
             last_post_url = ""
+            replies = 0
+            last_post_date = ""
+            last_poster = ""
 
             row = link.find_parent("tr")
             title = _extract_thread_title_from_row(row) if row is not None else ""
@@ -80,6 +83,18 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             if row is not None:
                 unread_url = _extract_unread_link_from_row(row)
                 unread_count = _extract_unread_count_from_row(row)
+
+                reply_el = row.select_one(".replies, td.replies, .replycount")
+                replies_text = _text(reply_el).replace(",", "")
+                if replies_text.isdigit():
+                    replies = int(replies_text)
+
+                lastpost_el = row.select_one(".lastpost, td.lastpost, .lastpostinfo")
+                if lastpost_el:
+                    date_el = lastpost_el.select_one(".date")
+                    poster_el = lastpost_el.select_one("a")
+                    last_post_date = _text(date_el) if date_el else ""
+                    last_poster = _text(poster_el) if poster_el else ""
 
                 lastpost_link = row.select_one("a[href*='goto=lastpost']")
                 if lastpost_link:
@@ -140,6 +155,9 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                     "thread_title": title,
                     "forum": forum_name,
                     "url": f"{BASE_URL}/{href.lstrip('/')}",
+                    "replies": replies,
+                    "last_post_date": last_post_date,
+                    "last_poster": last_poster,
                     "last_page_url": last_page_url,
                     "last_page_num": last_page_num,
                     "last_post_url": last_post_url,
@@ -169,6 +187,10 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             meta_parts = []
             if t["forum"]:
                 meta_parts.append(f"**Forum**: {t['forum']}")
+            if t["replies"]:
+                meta_parts.append(f"**Replies**: {t['replies']}")
+            if t["last_poster"]:
+                meta_parts.append(f"**Last post**: {t['last_post_date']} by {t['last_poster']}")
             meta_parts.append(f"**Link**: {t['url']}")
             if t["last_page_num"]:
                 meta_parts.append(f"**Last page**: {t['last_page_num']}")

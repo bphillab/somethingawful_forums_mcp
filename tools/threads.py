@@ -243,6 +243,12 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                     quote_author_el = quote.select_one(".author, cite")
                     qa = _text(quote_author_el) if quote_author_el else "someone"
                     quote.replace_with(f"[quote from {qa}]")
+                for img in content_el.select("img"):
+                    label = img.get("title") or img.get("alt") or ""
+                    if label:
+                        img.replace_with(f" {label} ")
+                    else:
+                        img.decompose()
                 content = content_el.get_text(" ", strip=True)
             else:
                 content = ""
@@ -276,6 +282,8 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         if params.since_post_id:
             posts = [p for p in posts if p["id"] > params.since_post_id]
 
+        unread_fetched = len(posts) if params.since_post_id else None
+
         if not posts:
             return (
                 f"No posts found in thread {effective_thread_id} page {effective_page}. "
@@ -292,11 +300,15 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             }
             if first_unread_post_id:
                 result["first_unread_post_id"] = first_unread_post_id
+            if unread_fetched is not None:
+                result["unread_posts_fetched"] = unread_fetched
             return json.dumps(result, indent=2)
 
         header = f"# {thread_title} (Thread ID: {effective_thread_id} | page {effective_page} of {total_pages})"
         if first_unread_post_id:
             header += f" | First unread post: #{first_unread_post_id}"
+        if unread_fetched is not None:
+            header += f" | {unread_fetched} unread posts fetched"
         lines = [header + "\n"]
         for p in posts:
             lines.append("---")
