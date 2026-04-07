@@ -26,11 +26,6 @@ from tools.usercp import register_tools as register_usercp_tools
 from session import SASession
 
 
-# ─────────────────────────── Constants ────────────────────────────────────────
-
-BASE_URL = "https://forums.somethingawful.com"
-DEFAULT_PER_PAGE = 40
-
 # ─────────────────────────── Session State ────────────────────────────────────
 
 _session = SASession()

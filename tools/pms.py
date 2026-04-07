@@ -6,11 +6,10 @@ from typing import Any, Dict, List
 
 from mcp.server.fastmcp import FastMCP
 
+from constants import BASE_URL
 from helpers import _attr, _extract_page_count, _handle_error, _require_login_msg, _soup, _text
 from models import GetPMInput, ListPMsInput
 from session import SASession
-
-BASE_URL = "https://forums.somethingawful.com"
 
 
 def register_tools(mcp: FastMCP, session: SASession) -> None:

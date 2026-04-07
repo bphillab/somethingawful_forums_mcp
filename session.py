@@ -4,14 +4,7 @@ from typing import Optional
 import httpx
 from bs4 import BeautifulSoup
 
-BASE_URL = "https://forums.somethingawful.com"
-LOGIN_URL = f"{BASE_URL}/account.php"
-DEFAULT_TIMEOUT = 30.0
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/120.0.0.0 Safari/537.36"
-)
+from constants import DEFAULT_TIMEOUT, LOGIN_URL, USER_AGENT
 
 
 class SASession:

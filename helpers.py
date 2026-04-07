@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from bs4 import BeautifulSoup, Tag
 import httpx
 
-BASE_URL = "https://forums.somethingawful.com"
+from constants import BASE_URL
 
 
 def _handle_error(e: Exception) -> str:

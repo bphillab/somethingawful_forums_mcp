@@ -3,37 +3,37 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class LoginInput(BaseModel):
+class SABaseModel(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+
+ResponseFormatField = Field(
+    default="markdown",
+    description="Output format: 'markdown' (default) or 'json'",
+    pattern="^(markdown|json)$",
+)
+
+
+class LoginInput(SABaseModel):
     # No fields — credentials come from env vars
+    pass
 
 
-class ListForumsInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    response_format: str = Field(
-        default="markdown",
-        description="Output format: 'markdown' (default) or 'json'",
-        pattern="^(markdown|json)$",
-    )
+class ListForumsInput(SABaseModel):
+    response_format: str = ResponseFormatField
 
 
-class ListThreadsInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+class ListThreadsInput(SABaseModel):
     forum_id: int = Field(
         ...,
         description="The SA forum ID (e.g. 46 for FYAD). Find IDs via sa_list_forums.",
         ge=1,
     )
     page: int = Field(default=1, description="Page number to fetch", ge=1)
-    response_format: str = Field(
-        default="markdown",
-        description="Output format: 'markdown' (default) or 'json'",
-        pattern="^(markdown|json)$",
-    )
+    response_format: str = ResponseFormatField
 
 
-class GetThreadInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+class GetThreadInput(SABaseModel):
     thread_id: Optional[int] = Field(
         default=None,
         description="The SA thread ID. Found in thread URLs as threadid=X. Required unless goto_post_id is set.",
@@ -58,15 +58,10 @@ class GetThreadInput(BaseModel):
         description="If set, only return posts with an ID greater than this value. Useful combined with goto_post_id to get only posts after a known post.",
         ge=1,
     )
-    response_format: str = Field(
-        default="markdown",
-        description="Output format: 'markdown' (default) or 'json'",
-        pattern="^(markdown|json)$",
-    )
+    response_format: str = ResponseFormatField
 
 
-class SearchInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+class SearchInput(SABaseModel):
     query: str = Field(
         ...,
         description=(
@@ -92,22 +87,22 @@ class SearchInput(BaseModel):
     )
     title: Optional[str] = Field(
         default=None,
-        description="Search within thread titles only. Appended as intitle:\"...\".",
+        description='Search within thread titles only. Appended as intitle:"...".',
         max_length=300,
     )
     since: Optional[str] = Field(
         default=None,
-        description="Restrict results to posts on or after this date. Accepts YYYY-MM-DD or relative strings like \"last monday\" or \"2 days ago\". Appended as since:\"...\".",
+        description='Restrict results to posts on or after this date. Accepts YYYY-MM-DD or relative strings like "last monday" or "2 days ago". Appended as since:"...".',
         max_length=100,
     )
     before: Optional[str] = Field(
         default=None,
-        description="Restrict results to posts before this date. Accepts YYYY-MM-DD or relative strings like \"last monday\" or \"2 days ago\". Appended as before:\"...\".",
+        description='Restrict results to posts before this date. Accepts YYYY-MM-DD or relative strings like "last monday" or "2 days ago". Appended as before:"...".',
         max_length=100,
     )
     quoting: Optional[str] = Field(
         default=None,
-        description="Restrict results to posts quoting this SA username. Appended as quoting:\"...\".",
+        description='Restrict results to posts quoting this SA username. Appended as quoting:"...".',
         max_length=100,
     )
     userid: Optional[int] = Field(
@@ -125,15 +120,10 @@ class SearchInput(BaseModel):
         description="If true, follow post redirects to resolve missing thread IDs. Makes one extra request per result with a missing thread ID — use sparingly.",
     )
     page: int = Field(default=1, description="Page of results to fetch", ge=1)
-    response_format: str = Field(
-        default="markdown",
-        description="Output format: 'markdown' (default) or 'json'",
-        pattern="^(markdown|json)$",
-    )
+    response_format: str = ResponseFormatField
 
 
-class GetUserInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+class GetUserInput(SABaseModel):
     username: Optional[str] = Field(
         default=None,
         description="SA username to look up. Provide either username or user_id.",
@@ -144,46 +134,27 @@ class GetUserInput(BaseModel):
         description="SA user ID to look up. Provide either username or user_id.",
         ge=1,
     )
-    response_format: str = Field(
-        default="markdown",
-        description="Output format: 'markdown' (default) or 'json'",
-        pattern="^(markdown|json)$",
-    )
+    response_format: str = ResponseFormatField
 
 
-class ListPMsInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+class ListPMsInput(SABaseModel):
     folder_id: int = Field(
         default=0,
         description="PM folder ID. 0 = Inbox (default), 1 = Sent, other numbers for custom folders.",
         ge=0,
     )
     page: int = Field(default=1, description="Page of messages to fetch", ge=1)
-    response_format: str = Field(
-        default="markdown",
-        description="Output format: 'markdown' (default) or 'json'",
-        pattern="^(markdown|json)$",
-    )
+    response_format: str = ResponseFormatField
 
 
-class GetPMInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+class GetPMInput(SABaseModel):
     pm_id: int = Field(
         ...,
         description="Private message ID. Found via sa_list_pms.",
         ge=1,
     )
-    response_format: str = Field(
-        default="markdown",
-        description="Output format: 'markdown' (default) or 'json'",
-        pattern="^(markdown|json)$",
-    )
+    response_format: str = ResponseFormatField
 
 
-class ListUserCPThreadsInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    response_format: str = Field(
-        default="markdown",
-        description="Output format: 'markdown' (default) or 'json'",
-        pattern="^(markdown|json)$",
-    )
+class ListUserCPThreadsInput(SABaseModel):
+    response_format: str = ResponseFormatField

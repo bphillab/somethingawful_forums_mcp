@@ -17,10 +17,9 @@ from helpers import (
     _soup,
     _text,
 )
+from constants import BASE_URL
 from models import ListUserCPThreadsInput
 from session import SASession
-
-BASE_URL = "https://forums.somethingawful.com"
 
 
 def register_tools(mcp: FastMCP, session: SASession) -> None:

@@ -16,11 +16,9 @@ from helpers import (
     _soup,
     _text,
 )
+from constants import BASE_URL, DEFAULT_PER_PAGE
 from models import GetThreadInput, ListThreadsInput
 from session import SASession
-
-BASE_URL = "https://forums.somethingawful.com"
-DEFAULT_PER_PAGE = 40
 
 
 def register_tools(mcp: FastMCP, session: SASession) -> None:
