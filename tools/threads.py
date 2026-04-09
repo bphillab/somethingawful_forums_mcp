@@ -218,6 +218,9 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         if params.since_post_id:
             posts = [p for p in posts if p["id"] > params.since_post_id]
 
+        if params.last_n_posts:
+            posts = posts[-params.last_n_posts:]
+
         unread_fetched = len(posts) if params.since_post_id else None
 
         if not posts:

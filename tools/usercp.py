@@ -105,6 +105,16 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
                 if not last_post_url:
                     last_post_url = last_page_url
 
+            if unread_url:
+                try:
+                    unread_resp = await session.get(unread_url)
+                    unread_resp.raise_for_status()
+                    final_url = str(unread_resp.url)
+                    unread_page = _extract_id(final_url, "pagenumber")
+                    first_unread_post_id = _extract_id(final_url, "postid")
+                except Exception:
+                    pass
+
             parent = link.parent
             for _ in range(4):
                 if parent is None:

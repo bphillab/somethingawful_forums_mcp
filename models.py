@@ -58,6 +58,11 @@ class GetThreadInput(SABaseModel):
         description="If set, only return posts with an ID greater than this value. Useful combined with goto_post_id to get only posts after a known post.",
         ge=1,
     )
+    last_n_posts: Optional[int] = Field(
+        default=None,
+        description="If set, return only the last N posts from the fetched page. Useful for getting a quick sense of recent activity without reading the full page.",
+        ge=1,
+    )
     response_format: str = ResponseFormatField
 
 
