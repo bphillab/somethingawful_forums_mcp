@@ -94,9 +94,9 @@ def _parse_posts(soup: BeautifulSoup) -> List[Dict[str, Any]]:
                 post_ref = ""
                 if quote_link_el:
                     href = _attr(quote_link_el, "href")
-                    pid = re.search(r"postid=(\d+)", href)
-                    if pid:
-                        post_ref = f" (post #{pid.group(1)})"
+                    qpid = re.search(r"postid=(\d+)", href)
+                    if qpid:
+                        post_ref = f" (post #{qpid.group(1)})"
                 if author_el:
                     author_el.decompose()
                 body = quote.get_text(" ", strip=True)
