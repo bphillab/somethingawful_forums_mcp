@@ -30,7 +30,11 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         annotations=_tool_annotations("List Threads on User Control Panel"),
     )
     async def sa_list_usercp_threads(params: ListUserCPThreadsInput) -> str:
-        """List thread links shown on the SA user control panel page."""
+        """List thread links shown on the SA user control panel page.
+
+        Each thread with unread posts includes an unread_count field.
+        When reading a thread's new posts, use sa_get_thread with last_page=True
+        and last_n_posts=<unread_count> to fetch only the unread posts."""
         url = f"{BASE_URL}/usercp.php"
         try:
             resp = await session.get(url)
@@ -104,16 +108,6 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
 
                 if not last_post_url:
                     last_post_url = last_page_url
-
-            if unread_url:
-                try:
-                    unread_resp = await session.get(unread_url)
-                    unread_resp.raise_for_status()
-                    final_url = str(unread_resp.url)
-                    unread_page = _extract_id(final_url, "pagenumber")
-                    first_unread_post_id = _extract_id(final_url, "postid")
-                except Exception:
-                    pass
 
             parent = link.parent
             for _ in range(4):

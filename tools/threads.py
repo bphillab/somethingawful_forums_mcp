@@ -153,7 +153,11 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         annotations=_tool_annotations("Read Thread Posts"),
     )
     async def sa_get_thread(params: GetThreadInput) -> str:
-        """Read posts from a Something Awful thread."""
+        """Read posts from a Something Awful thread.
+
+        To read only new posts from a thread, use last_page=True and
+        last_n_posts=<unread_count> where unread_count comes from sa_list_usercp_threads.
+        Do not fetch more posts than the unread_count — avoid re-reading already-seen posts."""
         if params.goto_post_id:
             url = (
                 f"{BASE_URL}/showthread.php"
