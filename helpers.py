@@ -87,9 +87,21 @@ def _parse_posts(soup: BeautifulSoup) -> List[Dict[str, Any]]:
         content_el = post_el.select_one(".postbody, .post-body, td.postbody")
         if content_el:
             for quote in content_el.select(".bbc-block, blockquote, .quote"):
-                quote_author_el = quote.select_one(".author, cite")
-                qa = _text(quote_author_el) if quote_author_el else "someone"
-                quote.replace_with(f"[quote from {qa}]")
+                author_el = quote.select_one("h4, .author, cite")
+                qa = _text(author_el) if author_el else ""
+                qa = re.sub(r"\s*posted:\s*$", "", qa, flags=re.IGNORECASE).strip()
+                quote_link_el = quote.select_one("a.quote_link")
+                post_ref = ""
+                if quote_link_el:
+                    href = _attr(quote_link_el, "href")
+                    pid = re.search(r"postid=(\d+)", href)
+                    if pid:
+                        post_ref = f" (post #{pid.group(1)})"
+                if author_el:
+                    author_el.decompose()
+                body = quote.get_text(" ", strip=True)
+                label = f"[quote from {qa}{post_ref}]" if qa else "[quote]"
+                quote.replace_with(f"{label} {body} [/quote]")
             for img in content_el.select("img"):
                 label = img.get("title") or img.get("alt") or ""
                 if label:

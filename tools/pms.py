@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List
 
 from mcp.server.fastmcp import FastMCP
@@ -138,9 +139,21 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         body_el = soup.select_one(".postbody, .pm-body, .message-body, .body")
         if body_el:
             for quote in body_el.select(".bbc-block, blockquote, .quote"):
-                qa_el = quote.select_one(".author, cite")
-                qa = _text(qa_el) if qa_el else "someone"
-                quote.replace_with(f"\n[quote from {qa}]\n")
+                author_el = quote.select_one("h4, .author, cite")
+                qa = _text(author_el) if author_el else ""
+                qa = re.sub(r"\s*posted:\s*$", "", qa, flags=re.IGNORECASE).strip()
+                quote_link_el = quote.select_one("a.quote_link")
+                post_ref = ""
+                if quote_link_el:
+                    href = quote_link_el.get("href", "") or ""
+                    pid = re.search(r"postid=(\d+)", href)
+                    if pid:
+                        post_ref = f" (post #{pid.group(1)})"
+                if author_el:
+                    author_el.decompose()
+                body_text = quote.get_text(" ", strip=True)
+                label = f"[quote from {qa}{post_ref}]" if qa else "[quote]"
+                quote.replace_with(f"\n{label} {body_text} [/quote]\n")
             body = body_el.get_text("\n", strip=True)
         else:
             body = ""
