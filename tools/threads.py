@@ -173,7 +173,7 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         elif params.last_page:
             url = (
                 f"{BASE_URL}/showthread.php"
-                f"?threadid={params.thread_id}&perpage={DEFAULT_PER_PAGE}&pagenumber=999999"
+                f"?threadid={params.thread_id}&goto=lastpost"
             )
         else:
             url = (
@@ -202,7 +202,8 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             final_url = str(resp.url)
             effective_page = _page_from_redirect(final_url, soup) or "?"
         elif params.last_page:
-            effective_page = total_pages
+            final_url = str(resp.url)
+            effective_page = _page_from_redirect(final_url, soup) or total_pages
         else:
             effective_page = params.page
 
