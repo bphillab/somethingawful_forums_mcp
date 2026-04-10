@@ -161,6 +161,16 @@ class GetPMInput(SABaseModel):
     response_format: str = ResponseFormatField
 
 
+class FetchEmbedInput(SABaseModel):
+    url: str = Field(
+        ...,
+        description="URL to fetch embed/preview metadata from (must be http or https).",
+        min_length=7,
+        max_length=2048,
+    )
+    response_format: str = ResponseFormatField
+
+
 class GetThreadInfoInput(SABaseModel):
     thread_id: int = Field(
         ...,

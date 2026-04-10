@@ -16,6 +16,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from tools.auth import register_tools as register_auth_tools
+from tools.embeds import register_tools as register_embed_tools
 from tools.forums import register_tools as register_forums_tools
 from tools.threads import register_tools as register_threads_tools
 from tools.search import register_tools as register_search_tools
@@ -51,6 +52,7 @@ mcp.settings.transport_security = TransportSecuritySettings(
 # ─────────────────────────── Tools ────────────────────────────────────────────
 
 register_auth_tools(mcp, _session)
+register_embed_tools(mcp, _session)
 register_forums_tools(mcp, _session)
 register_threads_tools(mcp, _session)
 register_search_tools(mcp, _session)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import Any, Dict
@@ -155,8 +156,9 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
     async def sa_get_thread(params: GetThreadInput) -> str:
         """Read posts from a Something Awful thread.
 
-        To read only new posts from a thread, use last_page=True and
-        last_n_posts=<unread_count> where unread_count comes from sa_list_usercp_threads.
+        To read only new posts, use last_page=True with last_n_posts=<unread_count>
+        where unread_count comes from sa_list_usercp_threads.
+        Alternatively, use goto_newpost=True to jump directly to the first unread post.
         Do not fetch more posts than the unread_count — avoid re-reading already-seen posts."""
         if params.goto_post_id:
             url = (
@@ -270,64 +272,109 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         annotations=_tool_annotations("Get Thread Metadata"),
     )
     async def sa_get_thread_info(params: GetThreadInfoInput) -> str:
-        """Get metadata for a Something Awful thread without fetching any posts.
+        """Get metadata for a Something Awful thread without fetching post content.
 
-        Returns title, forum, page count, locked/closed status, and OP author.
-        Use this for quick lookups or link previews. To read posts use sa_get_thread."""
-        url = (
+        Returns title, forum, page count, locked/closed status, OP author,
+        last poster, and last post date. Makes two concurrent requests (page 1
+        and last page). To read actual posts use sa_get_thread."""
+        url_first = (
             f"{BASE_URL}/showthread.php"
             f"?threadid={params.thread_id}&perpage={DEFAULT_PER_PAGE}&pagenumber=1"
         )
+        url_last = (
+            f"{BASE_URL}/showthread.php"
+            f"?threadid={params.thread_id}&goto=lastpost"
+        )
+
         try:
-            resp = await session.get(url)
-            resp.raise_for_status()
+            resp_first, resp_last = await asyncio.gather(
+                session.get(url_first),
+                session.get(url_last),
+            )
+            resp_first.raise_for_status()
+            resp_last.raise_for_status()
         except Exception as e:
             return _handle_error(e)
 
-        soup = _soup(resp.text)
+        soup_first = _soup(resp_first.text)
+        soup_last = _soup(resp_last.text)
 
-        title_el = soup.select_one("title, h1, .thread-title")
+        title_el = soup_first.select_one("title, h1, .thread-title")
         thread_title = _text(title_el).replace(" - Something Awful Forums", "").strip()
 
-        total_pages = _extract_page_count(soup)
+        total_pages = _extract_page_count(soup_first)
 
         # Forum name from breadcrumb
         forum_name = ""
-        for a in soup.select("a[href*='forumdisplay.php']"):
+        forum_id = 0
+        for a in soup_first.select("a[href*='forumdisplay.php']"):
             name = _text(a)
             if name:
                 forum_name = name
+                forum_id = _extract_id(_attr(a, "href"), "forumid")
                 break
 
-        # Locked / closed status — SA puts a notice or class on the page
+        # Locked / closed status
         locked = bool(
-            soup.select_one(
+            soup_first.select_one(
                 ".thread_closed, .closed, .locked, "
                 "#thread_closed, #closed, .threadclosed"
             )
         )
         if not locked:
-            # Fallback: look for text in common status elements
-            status_el = soup.select_one(".forumtitle, .threadinfo, .pagetitle")
+            status_el = soup_first.select_one(".forumtitle, .threadinfo, .pagetitle")
             if status_el and re.search(r"\b(closed|locked)\b", _text(status_el), re.I):
                 locked = True
 
         # OP author — first post on page 1
         op_author = ""
-        first_post = soup.select_one("table.post, div.post, tr.post")
+        op_author_id = 0
+        first_post = soup_first.select_one("table.post, div.post, tr.post")
         if first_post:
             author_el = first_post.select_one(
                 ".author, .username, td.userinfo .author, .postername, a.author"
             )
             op_author = _text(author_el)
+            author_link = first_post.select_one("a[href*='userid='], a[href*='member.php']")
+            m = re.search(r"userid=(\d+)", _attr(author_link, "href"))
+            if m:
+                op_author_id = int(m.group(1))
+
+        # Last poster and last post date — from the last page
+        last_poster = ""
+        last_poster_id = 0
+        last_post_date = ""
+        last_post_id = 0
+        all_last_posts = soup_last.select("table.post, div.post, tr.post")
+        if all_last_posts:
+            last_post = all_last_posts[-1]
+            author_el = last_post.select_one(
+                ".author, .username, td.userinfo .author, .postername, a.author"
+            )
+            last_poster = _text(author_el)
+            author_link = last_post.select_one("a[href*='userid='], a[href*='member.php']")
+            m = re.search(r"userid=(\d+)", _attr(author_link, "href"))
+            if m:
+                last_poster_id = int(m.group(1))
+            date_el = last_post.select_one(".postdate, .date, td.postdate")
+            last_post_date = _text(date_el)
+            pid_match = re.search(r"(\d+)", last_post.get("id", "") or "")
+            if pid_match:
+                last_post_id = int(pid_match.group(1))
 
         info: Dict[str, Any] = {
             "thread_id": params.thread_id,
             "title": thread_title,
             "forum": forum_name,
+            "forum_id": forum_id,
             "total_pages": total_pages,
             "locked": locked,
             "op_author": op_author,
+            "op_author_id": op_author_id,
+            "last_poster": last_poster,
+            "last_poster_id": last_poster_id,
+            "last_post_date": last_post_date,
+            "last_post_id": last_post_id,
         }
 
         if params.response_format == "json":
@@ -335,10 +382,15 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
 
         lines = [f"# {thread_title} (Thread ID: {params.thread_id})\n"]
         if forum_name:
-            lines.append(f"- **Forum**: {forum_name}")
+            lines.append(f"- **Forum**: {forum_name}" + (f" (ID: {forum_id})" if forum_id else ""))
         if op_author:
             lines.append(f"- **OP**: {op_author}")
         lines.append(f"- **Pages**: {total_pages}")
+        if last_poster:
+            line = f"- **Last post**: {last_poster}"
+            if last_post_date:
+                line += f" on {last_post_date}"
+            lines.append(line)
         if locked:
             lines.append("- **Status**: Locked")
         return "\n".join(lines)
