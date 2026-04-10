@@ -64,7 +64,10 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
         description = _og(soup, "description") or _tc(soup, "description")
         image = _og(soup, "image") or _tc(soup, "image")
         site_name = _og(soup, "site_name")
-        author = _og(soup, "article:author") or _tc(soup, "creator")
+        author = _tc(soup, "creator")
+        if not author:
+            el = soup.find("meta", property="article:author")
+            author = (el.get("content") or "").strip() if el else ""
         url_canonical = _og(soup, "url") or str(resp.url)
 
         embed = {
