@@ -19,7 +19,7 @@ from helpers import (
     _tool_annotations,
 )
 from constants import BASE_URL, DEFAULT_PER_PAGE
-from models import GetThreadInput, ListThreadsInput
+from models import GetThreadInfoInput, GetThreadInput, ListThreadsInput
 from session import SASession
 
 
@@ -262,4 +262,82 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             lines.append(p["content"] or "(empty post)")
             lines.append("")
         lines.append("---")
+        return "\n".join(lines)
+
+    @mcp.tool(
+        name="sa_get_thread_info",
+        annotations=_tool_annotations("Get Thread Metadata"),
+    )
+    async def sa_get_thread_info(params: GetThreadInfoInput) -> str:
+        """Get metadata for a Something Awful thread without fetching any posts.
+
+        Returns title, forum, page count, locked/closed status, and OP author.
+        Use this for quick lookups or link previews. To read posts use sa_get_thread."""
+        url = (
+            f"{BASE_URL}/showthread.php"
+            f"?threadid={params.thread_id}&perpage={DEFAULT_PER_PAGE}&pagenumber=1"
+        )
+        try:
+            resp = await session.get(url)
+            resp.raise_for_status()
+        except Exception as e:
+            return _handle_error(e)
+
+        soup = _soup(resp.text)
+
+        title_el = soup.select_one("title, h1, .thread-title")
+        thread_title = _text(title_el).replace(" - Something Awful Forums", "").strip()
+
+        total_pages = _extract_page_count(soup)
+
+        # Forum name from breadcrumb
+        forum_name = ""
+        for a in soup.select("a[href*='forumdisplay.php']"):
+            name = _text(a)
+            if name:
+                forum_name = name
+                break
+
+        # Locked / closed status — SA puts a notice or class on the page
+        locked = bool(
+            soup.select_one(
+                ".thread_closed, .closed, .locked, "
+                "#thread_closed, #closed, .threadclosed"
+            )
+        )
+        if not locked:
+            # Fallback: look for text in common status elements
+            status_el = soup.select_one(".forumtitle, .threadinfo, .pagetitle")
+            if status_el and re.search(r"\b(closed|locked)\b", _text(status_el), re.I):
+                locked = True
+
+        # OP author — first post on page 1
+        op_author = ""
+        first_post = soup.select_one("table.post, div.post, tr.post")
+        if first_post:
+            author_el = first_post.select_one(
+                ".author, .username, td.userinfo .author, .postername, a.author"
+            )
+            op_author = _text(author_el)
+
+        info: Dict[str, Any] = {
+            "thread_id": params.thread_id,
+            "title": thread_title,
+            "forum": forum_name,
+            "total_pages": total_pages,
+            "locked": locked,
+            "op_author": op_author,
+        }
+
+        if params.response_format == "json":
+            return json.dumps(info, indent=2)
+
+        lines = [f"# {thread_title} (Thread ID: {params.thread_id})\n"]
+        if forum_name:
+            lines.append(f"- **Forum**: {forum_name}")
+        if op_author:
+            lines.append(f"- **OP**: {op_author}")
+        lines.append(f"- **Pages**: {total_pages}")
+        if locked:
+            lines.append("- **Status**: Locked")
         return "\n".join(lines)

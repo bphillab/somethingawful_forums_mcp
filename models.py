@@ -161,5 +161,14 @@ class GetPMInput(SABaseModel):
     response_format: str = ResponseFormatField
 
 
+class GetThreadInfoInput(SABaseModel):
+    thread_id: int = Field(
+        ...,
+        description="The SA thread ID. Found in thread URLs as threadid=X.",
+        ge=1,
+    )
+    response_format: str = ResponseFormatField
+
+
 class ListUserCPThreadsInput(SABaseModel):
     response_format: str = ResponseFormatField
