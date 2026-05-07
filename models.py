@@ -46,7 +46,12 @@ class GetThreadInput(SABaseModel):
     )
     goto_newpost: bool = Field(
         default=False,
-        description="If true, follow the thread's goto=newpost link and fetch the page containing the first unread post.",
+        description=(
+            "If true, follow the thread's goto=newpost link and fetch the page containing the first unread post. "
+            "NOTE: This only fetches one page (40 posts max). If there are more unread posts on subsequent pages, "
+            "they will not be included. For threads with many unread posts, prefer last_page=True with "
+            "last_n_posts=<unread_count> to read from the end of the thread instead."
+        ),
     )
     goto_post_id: Optional[int] = Field(
         default=None,

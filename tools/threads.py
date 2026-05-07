@@ -156,9 +156,16 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
     async def sa_get_thread(params: GetThreadInput) -> str:
         """Read posts from a Something Awful thread.
 
-        To read only new posts, use last_page=True with last_n_posts=<unread_count>
-        where unread_count comes from sa_list_usercp_threads.
-        Alternatively, use goto_newpost=True to jump directly to the first unread post.
+        Pages contain 40 posts each.
+
+        To read only new posts, prefer last_page=True with last_n_posts=<unread_count>
+        where unread_count comes from sa_list_usercp_threads — this reads from the end of the
+        thread and captures all recent unread posts even when they span the final page.
+
+        goto_newpost=True jumps to the page containing the first unread post, but only fetches
+        that single page (up to 40 posts). If there are more unread posts on later pages they
+        will be missed. Use it only when unread_count is small enough to fit on one page.
+
         Do not fetch more posts than the unread_count — avoid re-reading already-seen posts."""
         if params.goto_post_id:
             url = (
