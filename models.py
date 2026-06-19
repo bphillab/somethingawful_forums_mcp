@@ -187,3 +187,31 @@ class GetThreadInfoInput(SABaseModel):
 
 class ListUserCPThreadsInput(SABaseModel):
     response_format: str = ResponseFormatField
+
+
+class GetBanlistInput(SABaseModel):
+    page: int = Field(default=1, description="Page of bans to fetch", ge=1)
+    ban_type: int = Field(
+        default=-1,
+        description=(
+            "Filter by ban type: -1=Any (default), 2=Probations, -2=ALL bans, "
+            "0=Regular bans, 7=Autobans, 9=Permabans"
+        ),
+    )
+    admin_id: int = Field(
+        default=0,
+        description="Filter by admin user ID. 0 = all admins (default).",
+        ge=0,
+    )
+    ban_month: int = Field(
+        default=0,
+        description="Filter by month (1-12). 0 = all months (default).",
+        ge=0,
+        le=12,
+    )
+    ban_year: int = Field(
+        default=0,
+        description="Filter by year (e.g. 2024). 0 = all years (default).",
+        ge=0,
+    )
+    response_format: str = ResponseFormatField

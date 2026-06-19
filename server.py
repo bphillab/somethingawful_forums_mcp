@@ -23,6 +23,7 @@ from tools.search import register_tools as register_search_tools
 from tools.users import register_tools as register_user_tools
 from tools.pms import register_tools as register_pms_tools
 from tools.usercp import register_tools as register_usercp_tools
+from tools.banlist import register_tools as register_banlist_tools
 
 from session import SASession
 
@@ -59,6 +60,7 @@ register_search_tools(mcp, _session)
 register_user_tools(mcp, _session)
 register_pms_tools(mcp, _session)
 register_usercp_tools(mcp, _session)
+register_banlist_tools(mcp, _session)
 
 ########### main##############
 if __name__ == "__main__":
