@@ -20,7 +20,7 @@ from helpers import (
     _tool_annotations,
 )
 from constants import BASE_URL, DEFAULT_PER_PAGE
-from models import GetThreadInfoInput, GetThreadInput, ListThreadsInput
+from models import GetPostInput, GetThreadInfoInput, GetThreadInput, ListThreadsInput
 from session import SASession
 
 
@@ -272,6 +272,61 @@ def register_tools(mcp: FastMCP, session: SASession) -> None:
             lines.append(p["content"] or "(empty post)")
             lines.append("")
         lines.append("---")
+        return "\n".join(lines)
+
+    @mcp.tool(
+        name="sa_get_post",
+        annotations=_tool_annotations("Get a Single Post by ID"),
+    )
+    async def sa_get_post(params: GetPostInput) -> str:
+        """Fetch a single SA post by its post ID.
+
+        Uses the goto=post redirect to land on the right page, then returns
+        only the matching post along with thread context (title, thread ID, page)."""
+        url = f"{BASE_URL}/showthread.php?goto=post&noseen=1&postid={params.post_id}"
+        try:
+            resp = await session.get(url)
+            resp.raise_for_status()
+        except Exception as e:
+            return _handle_error(e)
+
+        soup = _soup(resp.text)
+        final_url = str(resp.url)
+
+        title_el = soup.select_one("title, h1, .thread-title")
+        thread_title = _text(title_el).replace(" - Something Awful Forums", "").strip()
+        thread_id = _extract_id(final_url, "threadid")
+        page = _page_from_redirect(final_url, soup) or "?"
+
+        posts = _parse_posts(soup)
+        post = next((p for p in posts if p["id"] == params.post_id), None)
+
+        if post is None:
+            return (
+                f"Post #{params.post_id} not found on the page SA redirected to "
+                f"(thread {thread_id}, page {page}). It may have been deleted."
+            )
+
+        if params.response_format == "json":
+            return json.dumps(
+                {
+                    "thread_id": thread_id,
+                    "thread_title": thread_title,
+                    "page": page,
+                    "post": post,
+                },
+                indent=2,
+            )
+
+        lines = [
+            f"# Post #{params.post_id} in {thread_title} (Thread ID: {thread_id}, page {page})\n",
+            "---",
+            f"**{post['author'] or 'unknown'}** | Post #{post['id']} | {post['date']}",
+            "",
+            post["content"] or "(empty post)",
+            "",
+            "---",
+        ]
         return "\n".join(lines)
 
     @mcp.tool(

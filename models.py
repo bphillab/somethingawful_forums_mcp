@@ -189,6 +189,15 @@ class ListUserCPThreadsInput(SABaseModel):
     response_format: str = ResponseFormatField
 
 
+class GetPostInput(SABaseModel):
+    post_id: int = Field(
+        ...,
+        description="The SA post ID. Found in post permalink URLs as postid=X.",
+        ge=1,
+    )
+    response_format: str = ResponseFormatField
+
+
 class GetBanlistInput(SABaseModel):
     page: int = Field(default=1, description="Page of bans to fetch", ge=1)
     ban_type: int = Field(
